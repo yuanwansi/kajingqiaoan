@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>C端 - 公众查询小程序 - 喀境桥安</title>
+  <!-- 引入Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <!-- 引入Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  
+  <!-- Tailwind配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#0D1B2A',
+            secondary: '#2C3E50',
+            success: '#4CAF50',
+            warning: '#FF9800',
+            danger: '#F44336',
+            info: '#64B5F6',
+          },
+          fontFamily: {
+            sans: ['"Noto Sans SC"', '"Source Han Sans SC"', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+  
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .text-shadow {
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .transition-all-300 {
+        transition: all 0.3s ease;
+      }
+      .card-shadow {
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      }
+      .input-focus {
+        box-shadow: 0 0 0 3px rgba(100, 181, 246, 0.3);
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.5s ease-in;
+      }
+      .animate-slide-up {
+        animation: slideUp 0.5s ease-out;
+      }
+      .animate-scale {
+        animation: scale 0.5s ease;
+      }
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    
+    @keyframes scale {
+      0% { transform: scale(0.8); opacity: 0; }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    
+    /* 隐藏滚动条但保留功能 */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+  </style>
+</head>
+<body class="bg-gray-100 font-sans text-gray-800 min-h-screen flex flex-col no-scrollbar">
+  <!-- 页面容器 -->
+  <div class="flex-1 flex flex-col max-w-md mx-auto w-full">
+    <!-- 首页 - 查询页面 -->
+    <div id="home-page" class="flex-1 flex flex-col p-6">
+      <!-- 顶部标题 -->
+      <div class="text-center mt-10 mb-12">
+        <div class="inline-block p-4 rounded-full bg-primary/10 mb-4">
+          <i class="fa fa-bridge text-4xl text-primary"></i>
+        </div>
+        <h1 class="text-2xl font-bold text-primary mb-2">喀境桥安</h1>
+        <p class="text-gray-500">桥梁安全一键查询</p>
+      </div>
+      
+      <!-- 搜索框区域 -->
+      <div class="mb-8 animate-slide-up">
+        <div class="relative">
+          <input type="text" id="bridge-search" placeholder="请输入桥梁名称" 
+                 class="w-full py-4 px-5 bg-white border border-gray-200 rounded-xl text-lg focus:outline-none focus:input-focus transition-all-300 card-shadow">
+          <div class="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400">
+            <i class="fa fa-search text-xl"></i>
+          </div>
+        </div>
+        <p class="text-center text-gray-500 text-sm mt-3">
+          或 <span class="text-primary font-medium cursor-pointer" id="scan-qrcode">扫描桥头二维码</span>
+        </p>
+      </div>
+      
+      <!-- 常用查询 -->
+      <div class="mt-auto animate-slide-up" style="animation-delay: 0.2s">
+        <h2 class="text-gray-500 text-sm mb-3">常用查询</h2>
+        <div class="flex flex-wrap gap-2">
+          <button class="bg-white px-4 py-2 rounded-lg text-sm card-shadow transition-all-300 hover:shadow-md" onclick="document.getElementById('bridge-search').value='花溪大桥'; simulateSearch('花溪大桥')">
+            花溪大桥
+          </button>
+          <button class="bg-white px-4 py-2 rounded-lg text-sm card-shadow transition-all-300 hover:shadow-md" onclick="document.getElementById('bridge-search').value='南明河大桥'; simulateSearch('南明河大桥')">
+            南明河大桥
+          </button>
+          <button class="bg-white px-4 py-2 rounded-lg text-sm card-shadow transition-all-300 hover:shadow-md" onclick="document.getElementById('bridge-search').value='观山湖大桥'; simulateSearch('观山湖大桥')">
+            观山湖大桥
+          </button>
+          <button class="bg-white px-4 py-2 rounded-lg text-sm card-shadow transition-all-300 hover:shadow-md" onclick="document.getElementById('bridge-search').value='贵黄高速2号桥'; simulateSearch('贵黄高速2号桥')">
+            贵黄高速2号桥
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 结果页 - 安全信息展示 -->
+    <div id="result-page" class="flex-1 flex flex-col p-6 hidden">
+      <!-- 返回按钮 -->
+      <div class="mb-6">
+        <button id="back-button" class="p-2 rounded-full bg-white card-shadow">
+          <i class="fa fa-arrow-left text-primary"></i>
+        </button>
+      </div>
+      
+      <!-- 桥梁名称 -->
+      <h2 id="result-bridge-name" class="text-xl font-bold text-center mb-8 animate-slide-up">花溪大桥</h2>
+      
+      <!-- 安全评分区域 -->
+      <div class="mb-10 animate-scale">
+        <div class="bg-white rounded-2xl p-6 text-center card-shadow">
+          <div id="safety-score-container" class="inline-block relative">
+            <div class="text-6xl font-bold text-success" id="safety-score">85</div>
+            <div class="text-xl font-medium text-gray-400 absolute -top-2 -right-10">/100</div>
+          </div>
+          <div class="mt-2 text-xl font-semibold text-success" id="safety-level">良好</div>
+        </div>
+      </div>
+      
+      <!-- 交通信号灯式指示器 -->
+      <div class="flex justify-center mb-8 animate-slide-up" style="animation-delay: 0.2s">
+        <div id="status-indicator" class="w-24 h-24 rounded-full bg-success flex items-center justify-center card-shadow">
+          <i class="fa fa-smile-o text-white text-5xl"></i>
+        </div>
+      </div>
+      
+      <!-- AI提示信息 -->
+      <div class="mb-8 animate-slide-up" style="animation-delay: 0.3s">
+        <div class="bg-white rounded-2xl p-6 card-shadow">
+          <h3 class="text-gray-500 text-sm mb-3">AI安全提示</h3>
+          <p id="ai-message" class="text-gray-800 leading-relaxed">
+            当前桥梁结构稳定，可安全通行。
+          </p>
+        </div>
+      </div>
+      
+      <!-- 历史健康度曲线 -->
+      <div class="flex-1 animate-slide-up" style="animation-delay: 0.4s">
+        <div class="bg-white rounded-2xl p-6 card-shadow h-full">
+          <div class="flex justify-between items-center mb-6">
+            <h3 class="text-gray-500 text-sm">历史健康度趋势</h3>
+            <div class="text-xs text-gray-400">近30天</div>
+          </div>
+          <div class="h-48">
+            <canvas id="healthTrendChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 桥梁数据模拟
+    const bridgesData = {
+      '花溪大桥': {
+        score: 85,
+        level: '良好',
+        levelColor: 'text-success',
+        indicatorColor: 'bg-success',
+        indicatorIcon: 'fa-smile-o',
+        message: '当前桥梁结构稳定，可安全通行。'
+      },
+      '南明河大桥': {
+        score: 72,
+        level: '一般',
+        levelColor: 'text-warning',
+        indicatorColor: 'bg-warning',
+        indicatorIcon: 'fa-meh-o',
+        message: '检测到轻微异常，车辆通行请注意减速慢行。'
+      },
+      '观山湖大桥': {
+        score: 92,
+        level: '优秀',
+        levelColor: 'text-success',
+        indicatorColor: 'bg-success',
+        indicatorIcon: 'fa-smile-o',
+        message: '桥梁状态优异，可放心通行。'
+      },
+      '贵黄高速2号桥': {
+        score: 45,
+        level: '危险',
+        levelColor: 'text-danger',
+        indicatorColor: 'bg-danger',
+        indicatorIcon: 'fa-frown-o',
+        message: '检测到潜在风险，建议绕行花溪大道或其他路线。'
+      }
+    };
+    
+    // 模拟搜索功能
+    function simulateSearch(bridgeName) {
+      // 显示加载动画
+      const searchInput = document.getElementById('bridge-search');
+      searchInput.disabled = true;
+      searchInput.placeholder = '搜索中...';
+      
+      // 模拟网络延迟
+      setTimeout(() => {
+        // 隐藏首页，显示结果页
+        document.getElementById('home-page').classList.add('hidden');
+        document.getElementById('result-page').classList.remove('hidden');
+        
+        // 获取桥梁数据
+        const bridgeData = bridgesData[bridgeName] || bridgesData['花溪大桥'];
+        
+        // 更新结果页数据
+        document.getElementById('result-bridge-name').textContent = bridgeName;
+        document.getElementById('safety-score').textContent = bridgeData.score;
+        document.getElementById('safety-level').textContent = bridgeData.level;
+        document.getElementById('safety-level').className = `mt-2 text-xl font-semibold ${bridgeData.levelColor}`;
+        document.getElementById('status-indicator').className = `w-24 h-24 rounded-full ${bridgeData.indicatorColor} flex items-center justify-center card-shadow`;
+        document.getElementById('status-indicator').innerHTML = `<i class="fa ${bridgeData.indicatorIcon} text-white text-5xl"></i>`;
+        document.getElementById('ai-message').textContent = bridgeData.message;
+        
+        // 重置搜索框
+        searchInput.disabled = false;
+        searchInput.placeholder = '请输入桥梁名称';
+        
+        // 初始化健康度趋势图
+        initHealthTrendChart(bridgeData.score);
+        
+      }, 800);
+    }
+    
+    // 初始化健康度趋势图
+    function initHealthTrendChart(currentScore) {
+      const ctx = document.getElementById('healthTrendChart').getContext('2d');
+      
+      // 生成模拟数据，最后一个值为当前评分
+      const data = [];
+      let baseValue = currentScore + (Math.random() * 10 - 5); // 基础值稍有波动
+      for (let i = 0; i < 6; i++) {
+        data.push(Math.max(0, Math.min(100, baseValue + (Math.random() * 8 - 4))));
+      }
+      data.push(currentScore);
+      
+      // 销毁旧图表（如果存在）
+      if (window.healthChart) {
+        window.healthChart.destroy();
+      }
+      
+      // 创建新图表
+      window.healthChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['5/20', '5/25', '6/1', '6/5', '6/10', '6/13', '6/15'],
+          datasets: [{
+            label: '健康度',
+            data: data,
+            borderColor: '#0D1B2A',
+            backgroundColor: 'rgba(13, 27, 42, 0.1)',
+            tension: 0.4,
+            fill: true,
+            pointBackgroundColor: currentScore < 60 ? '#F44336' : currentScore < 80 ? '#FF9800' : '#4CAF50',
+            pointRadius: 5,
+            pointHoverRadius: 7
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              callbacks: {
+                label: function(context) {
+                  return `健康度: ${context.parsed.y.toFixed(1)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                display: false
+              },
+              ticks: {
+                font: {
+                  size: 10
+                }
+              }
+            },
+            y: {
+              beginAtZero: true,
+              max: 100,
+              ticks: {
+                stepSize: 20,
+                font: {
+                  size: 10
+                }
+              },
+              grid: {
+                color: 'rgba(0, 0, 0, 0.05)'
+              }
+            }
+          }
+        }
+      });
+    }
+    
+    // 返回按钮事件
+    document.getElementById('back-button').addEventListener('click', function() {
+      document.getElementById('result-page').classList.add('hidden');
+      document.getElementById('home-page').classList.remove('hidden');
+    });
+    
+    // 搜索框回车事件
+    document.getElementById('bridge-search').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter' && this.value.trim()) {
+        simulateSearch(this.value.trim());
+      }
+    });
+    
+    // 扫描二维码事件
+    document.getElementById('scan-qrcode').addEventListener('click', function() {
+      alert('打开摄像头扫描二维码功能将在实际小程序中实现');
+      // 模拟扫描结果
+      setTimeout(() => {
+        simulateSearch('南明河大桥');
+      }, 1000);
+    });
+    
+    // 动画效果：数字增长
+    function animateValue(obj, start, end, duration) {
+      let startTimestamp = null;
+      const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        obj.innerHTML = Math.floor(progress * (end - start) + start);
+        if (progress < 1) {
+          window.requestAnimationFrame(step);
+        }
+      };
+      window.requestAnimationFrame(step);
+    }
+  </script>
+</body>
+</html>

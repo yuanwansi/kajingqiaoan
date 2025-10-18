@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>喀境桥安 - 桥梁安全监测系统</title>
+  <!-- 引入Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <!-- 引入Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  
+  <!-- Tailwind配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#0D1B2A',
+            secondary: '#2C3E50',
+            success: '#4CAF50',
+            warning: '#FF9800',
+            danger: '#F44336',
+            info: '#64B5F6',
+            dark: '#121212',
+          },
+          fontFamily: {
+            sans: ['"Noto Sans SC"', '"Source Han Sans SC"', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+  
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .text-shadow {
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .animate-pulse-slow {
+        animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+      .animate-float {
+        animation: float 6s ease-in-out infinite;
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    }
+    
+    @keyframes float {
+      0% {
+        transform: translateY(0px);
+      }
+      50% {
+        transform: translateY(-10px);
+      }
+      100% {
+        transform: translateY(0px);
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-sans text-gray-800">
+  <!-- 登录页面 -->
+  <div class="min-h-screen flex items-center justify-center bg-primary">
+    <div class="w-full max-w-md p-8 bg-white rounded-lg shadow-xl">
+      <div class="text-center mb-8">
+        <h2 class="text-3xl font-bold text-primary mb-2">喀境桥安</h2>
+        <p class="text-gray-600">喀斯特山区桥梁智能预防坍塌系统</p>
+      </div>
+      
+      <form>
+        <div class="mb-6">
+          <label class="block text-gray-700 text-sm font-bold mb-2" for="user-type">
+            用户类型
+          </label>
+          <select id="user-type" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            <option value="">请选择用户类型</option>
+            <option value="g">政府交通管理部门 (G端)</option>
+            <option value="b">桥梁养护公司 (B端)</option>
+            <option value="insurance">保险机构</option>
+            <option value="c">公众用户 (C端)</option>
+          </select>
+        </div>
+        
+        <div class="mb-6">
+          <label class="block text-gray-700 text-sm font-bold mb-2" for="username">
+            用户名
+          </label>
+          <input id="username" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" type="text" placeholder="请输入用户名">
+        </div>
+        
+        <div class="mb-8">
+          <label class="block text-gray-700 text-sm font-bold mb-2" for="password">
+            密码
+          </label>
+          <input id="password" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" type="password" placeholder="请输入密码">
+        </div>
+        
+        <div class="flex items-center justify-between">
+          <button id="login-btn" class="px-8 py-3 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+            登录
+          </button>
+          <a href="#" class="text-primary hover:text-primary/80 text-sm">忘记密码?</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // 登录按钮点击事件
+    document.getElementById('login-btn').addEventListener('click', function(e) {
+      e.preventDefault();
+      const userType = document.getElementById('user-type').value;
+      
+      // 根据用户类型跳转到对应页面
+      switch(userType) {
+        case 'g':
+          window.location.href = 'g-dashboard.html';
+          break;
+        case 'b':
+          window.location.href = 'b-dashboard.html';
+          break;
+        case 'c':
+          window.location.href = 'c-dashboard.html';
+          break;
+        case 'insurance':
+          window.location.href = 'b-dashboard.html';
+          break;
+        default:
+          alert('请选择用户类型');
+      }
+    });
+  </script>
+</body>
+</html>

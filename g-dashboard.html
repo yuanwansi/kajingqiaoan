@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>G端 - 指挥中心大屏 - 喀境桥安</title>
+  <!-- 引入Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <!-- 引入Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  <!-- 引入Mapbox GL JS -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+  
+  <!-- Tailwind配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#0D1B2A',
+            secondary: '#2C3E50',
+            success: '#4CAF50',
+            warning: '#FF9800',
+            danger: '#F44336',
+            info: '#64B5F6',
+            dark: '#121212',
+          },
+          fontFamily: {
+            sans: ['"Noto Sans SC"', '"Source Han Sans SC"', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+  
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .text-shadow {
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      }
+      .animate-pulse-slow {
+        animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+      .animate-blink {
+        animation: blink 1s infinite;
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    }
+    
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body class="bg-primary text-white min-h-screen overflow-hidden">
+  <!-- 顶部标题栏 -->
+  <header class="bg-primary border-b border-gray-700 h-16 flex items-center justify-between px-6">
+    <div class="flex items-center space-x-2">
+      <i class="fa fa-bridge text-2xl text-info"></i>
+      <h1 class="text-xl font-bold">喀境桥安 - 喀斯特山区桥梁安全监测指挥中心</h1>
+    </div>
+    <div class="flex items-center space-x-6">
+      <div class="text-right">
+        <div class="text-sm text-gray-300">当前登录</div>
+        <div class="font-medium">贵州省交通厅</div>
+      </div>
+      <button class="p-2 hover:bg-gray-700 rounded-full transition-colors">
+        <i class="fa fa-sign-out"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- 主要内容区域 -->
+  <div class="flex h-[calc(100vh-4rem)]">
+    <!-- 左侧面板 -->
+    <div class="w-80 bg-secondary/80 backdrop-blur-sm p-4 overflow-y-auto scrollbar-hide">
+      <!-- 关键指标总览 -->
+      <div class="mb-6">
+        <h2 class="text-lg font-bold mb-4 flex items-center">
+          <i class="fa fa-tachometer mr-2 text-info"></i>关键指标总览
+        </h2>
+        <div class="grid grid-cols-1 gap-4">
+          <div class="bg-primary/60 rounded-lg p-4 border border-gray-700">
+            <div class="text-gray-400 text-sm">监测桥梁总数</div>
+            <div class="text-3xl font-bold mt-1">258</div>
+          </div>
+          <div class="bg-primary/60 rounded-lg p-4 border border-gray-700">
+            <div class="text-gray-400 text-sm">今日预警总数</div>
+            <div class="text-3xl font-bold mt-1 text-warning">12</div>
+          </div>
+          <div class="bg-primary/60 rounded-lg p-4 border border-gray-700">
+            <div class="text-gray-400 text-sm">健康桥梁占比</div>
+            <div class="text-3xl font-bold mt-1 text-success">89%</div>
+            <div class="mt-2 h-2 bg-gray-700 rounded-full overflow-hidden">
+              <div class="h-full bg-success rounded-full" style="width: 89%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 实时预警列表 -->
+      <div>
+        <h2 class="text-lg font-bold mb-4 flex items-center">
+          <i class="fa fa-bell mr-2 text-warning"></i>实时预警列表
+        </h2>
+        <div class="space-y-3">
+          <div class="bg-danger/20 rounded-lg p-3 border border-danger/30 animate-pulse-slow">
+            <div class="flex justify-between items-start">
+              <h3 class="font-bold">贵黄高速2号桥</h3>
+              <span class="text-xs bg-danger/30 px-2 py-1 rounded-full">危险</span>
+            </div>
+            <div class="text-gray-300 text-sm mt-1">基础沉降异常</div>
+            <div class="text-xs text-gray-400 mt-2">2023-06-15 14:35:22</div>
+          </div>
+          
+          <div class="bg-warning/20 rounded-lg p-3 border border-warning/30">
+            <div class="flex justify-between items-start">
+              <h3 class="font-bold">花溪大桥</h3>
+              <span class="text-xs bg-warning/30 px-2 py-1 rounded-full">注意</span>
+            </div>
+            <div class="text-gray-300 text-sm mt-1">裂缝扩大</div>
+            <div class="text-xs text-gray-400 mt-2">2023-06-15 13:42:18</div>
+          </div>
+          
+          <div class="bg-warning/20 rounded-lg p-3 border border-warning/30">
+            <div class="flex justify-between items-start">
+              <h3 class="font-bold">南明河大桥</h3>
+              <span class="text-xs bg-warning/30 px-2 py-1 rounded-full">注意</span>
+            </div>
+            <div class="text-gray-300 text-sm mt-1">溶洞风险</div>
+            <div class="text-xs text-gray-400 mt-2">2023-06-15 11:28:54</div>
+          </div>
+          
+          <div class="bg-primary/60 rounded-lg p-3 border border-gray-700">
+            <div class="flex justify-between items-start">
+              <h3 class="font-bold">观山湖大桥</h3>
+              <span class="text-xs bg-success/30 px-2 py-1 rounded-full">正常</span>
+            </div>
+            <div class="text-gray-300 text-sm mt-1">定期检查</div>
+            <div class="text-xs text-gray-400 mt-2">2023-06-15 10:15:36</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中央地图区域 -->
+    <div class="flex-1 relative">
+      <!-- 模拟地图 -->
+      <div id="map" class="w-full h-full bg-gray-800 relative overflow-hidden">
+        <!-- 地图背景 -->
+        <div class="absolute inset-0 opacity-30">
+          <img src="https://picsum.photos/id/1015/1920/1080" alt="地图背景" class="w-full h-full object-cover">
+        </div>
+        
+        <!-- 桥梁图标 -->
+        <!-- 安全桥梁 -->
+        <div class="absolute top-1/4 left-1/4 animate-float cursor-pointer" data-bridge="bridge1">
+          <div class="relative">
+            <div class="w-8 h-8 bg-success rounded-full flex items-center justify-center shadow-lg">
+              <i class="fa fa-bridge"></i>
+            </div>
+            <div class="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-primary/90 px-2 py-1 rounded text-xs whitespace-nowrap">花溪大桥</div>
+          </div>
+        </div>
+        
+        <!-- 注意桥梁 -->
+        <div class="absolute top-1/3 right-1/3 animate-float cursor-pointer animate-blink" data-bridge="bridge2">
+          <div class="relative">
+            <div class="w-8 h-8 bg-warning rounded-full flex items-center justify-center shadow-lg">
+              <i class="fa fa-bridge"></i>
+            </div>
+            <div class="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-primary/90 px-2 py-1 rounded text-xs whitespace-nowrap">南明河大桥</div>
+          </div>
+        </div>
+        
+        <!-- 危险桥梁 -->
+        <div class="absolute bottom-1/4 right-1/4 animate-float cursor-pointer animate-blink" data-bridge="bridge3">
+          <div class="relative">
+            <div class="w-8 h-8 bg-danger rounded-full flex items-center justify-center shadow-lg">
+              <i class="fa fa-bridge"></i>
+            </div>
+            <div class="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-primary/90 px-2 py-1 rounded text-xs whitespace-nowrap">贵黄高速2号桥</div>
+          </div>
+        </div>
+        
+        <!-- 安全桥梁 -->
+        <div class="absolute bottom-1/3 left-1/3 animate-float cursor-pointer" data-bridge="bridge4">
+          <div class="relative">
+            <div class="w-8 h-8 bg-success rounded-full flex items-center justify-center shadow-lg">
+              <i class="fa fa-bridge"></i>
+            </div>
+            <div class="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-primary/90 px-2 py-1 rounded text-xs whitespace-nowrap">观山湖大桥</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 桥梁详情卡片 -->
+      <div id="bridge-card" class="hidden absolute top-10 right-10 bg-primary/95 backdrop-blur-md p-4 rounded-lg shadow-xl border border-gray-700 w-72 z-10">
+        <div class="flex justify-between items-start">
+          <h3 id="bridge-name" class="text-lg font-bold">花溪大桥</h3>
+          <span id="bridge-status" class="text-xs bg-success/30 px-2 py-1 rounded-full">正常</span>
+        </div>
+        <div class="mt-4 space-y-2">
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-400">安全评分</span>
+            <span id="bridge-score" class="font-medium text-success">92</span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-400">最后检测时间</span>
+            <span id="bridge-time" class="font-medium">2023-06-15 14:30</span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-400">风险类型</span>
+            <span id="bridge-risk" class="font-medium">无</span>
+          </div>
+        </div>
+        <div class="mt-4 pt-3 border-t border-gray-700">
+          <button class="w-full bg-info/20 hover:bg-info/30 text-info py-2 rounded transition-colors text-sm">
+            查看详情
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧面板 -->
+    <div class="w-80 bg-secondary/80 backdrop-blur-sm p-4 overflow-y-auto scrollbar-hide">
+      <!-- AI风险预测趋势图 -->
+      <div class="mb-6">
+        <h2 class="text-lg font-bold mb-4 flex items-center">
+          <i class="fa fa-line-chart mr-2 text-info"></i>AI风险预测趋势
+        </h2>
+        <div class="bg-primary/60 rounded-lg p-4 border border-gray-700 h-64">
+          <canvas id="riskTrendChart"></canvas>
+        </div>
+      </div>
+      
+      <!-- 预警类型分布饼图 -->
+      <div>
+        <h2 class="text-lg font-bold mb-4 flex items-center">
+          <i class="fa fa-pie-chart mr-2 text-info"></i>预警类型分布
+        </h2>
+        <div class="bg-primary/60 rounded-lg p-4 border border-gray-700 h-64">
+          <canvas id="alertTypeChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部面板 -->
+  <div class="h-40 bg-secondary/90 backdrop-blur-sm border-t border-gray-700 overflow-hidden">
+    <div class="p-4">
+      <h2 class="text-lg font-bold mb-2 flex items-center">
+        <i class="fa fa-video-camera mr-2 text-info"></i>重点桥梁监控
+      </h2>
+      <div class="flex space-x-4 overflow-x-auto scrollbar-hide">
+        <!-- 监控项1 -->
+        <div class="flex-shrink-0 w-80 bg-primary/60 rounded-lg overflow-hidden border border-gray-700">
+          <div class="bg-black h-28 relative">
+            <img src="https://picsum.photos/id/1024/320/140" alt="桥梁监控" class="w-full h-full object-cover opacity-80">
+            <div class="absolute top-2 right-2 bg-danger px-2 py-1 rounded text-xs animate-blink">危险预警</div>
+          </div>
+          <div class="p-2 flex justify-between items-center">
+            <div>
+              <div class="font-medium">贵黄高速2号桥</div>
+              <div class="text-xs text-gray-400">基础沉降异常</div>
+            </div>
+            <button class="text-info hover:text-info/80">
+              <i class="fa fa-expand"></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- 监控项2 -->
+        <div class="flex-shrink-0 w-80 bg-primary/60 rounded-lg overflow-hidden border border-gray-700">
+          <div class="bg-black h-28 relative">
+            <img src="https://picsum.photos/id/1025/320/140" alt="桥梁监控" class="w-full h-full object-cover opacity-80">
+            <div class="absolute top-2 right-2 bg-warning px-2 py-1 rounded text-xs">注意预警</div>
+          </div>
+          <div class="p-2 flex justify-between items-center">
+            <div>
+              <div class="font-medium">花溪大桥</div>
+              <div class="text-xs text-gray-400">裂缝扩大</div>
+            </div>
+            <button class="text-info hover:text-info/80">
+              <i class="fa fa-expand"></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- 监控项3 -->
+        <div class="flex-shrink-0 w-80 bg-primary/60 rounded-lg overflow-hidden border border-gray-700">
+          <div class="bg-black h-28 relative">
+            <img src="https://picsum.photos/id/1026/320/140" alt="桥梁监控" class="w-full h-full object-cover opacity-80">
+            <div class="absolute top-2 right-2 bg-success px-2 py-1 rounded text-xs">正常</div>
+          </div>
+          <div class="p-2 flex justify-between items-center">
+            <div>
+              <div class="font-medium">观山湖大桥</div>
+              <div class="text-xs text-gray-400">运行正常</div>
+            </div>
+            <button class="text-info hover:text-info/80">
+              <i class="fa fa-expand"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 桥梁数据
+    const bridgeData = {
+      bridge1: {
+        name: '花溪大桥',
+        status: '正常',
+        statusClass: 'bg-success/30',
+        score: 92,
+        scoreClass: 'text-success',
+        time: '2023-06-15 14:30',
+        risk: '无'
+      },
+      bridge2: {
+        name: '南明河大桥',
+        status: '注意',
+        statusClass: 'bg-warning/30',
+        score: 75,
+        scoreClass: 'text-warning',
+        time: '2023-06-15 13:45',
+        risk: '溶洞风险'
+      },
+      bridge3: {
+        name: '贵黄高速2号桥',
+        status: '危险',
+        statusClass: 'bg-danger/30',
+        score: 45,
+        scoreClass: 'text-danger',
+        time: '2023-06-15 14:35',
+        risk: '基础沉降异常'
+      },
+      bridge4: {
+        name: '观山湖大桥',
+        status: '正常',
+        statusClass: 'bg-success/30',
+        score: 95,
+        scoreClass: 'text-success',
+        time: '2023-06-15 14:20',
+        risk: '无'
+      }
+    };
+    
+    // 桥梁点击事件
+    document.querySelectorAll('[data-bridge]').forEach(bridge => {
+      bridge.addEventListener('click', function() {
+        const bridgeId = this.dataset.bridge;
+        const data = bridgeData[bridgeId];
+        
+        // 更新卡片数据
+        document.getElementById('bridge-name').textContent = data.name;
+        document.getElementById('bridge-status').textContent = data.status;
+        document.getElementById('bridge-status').className = `text-xs ${data.statusClass} px-2 py-1 rounded-full`;
+        document.getElementById('bridge-score').textContent = data.score;
+        document.getElementById('bridge-score').className = `font-medium ${data.scoreClass}`;
+        document.getElementById('bridge-time').textContent = data.time;
+        document.getElementById('bridge-risk').textContent = data.risk;
+        
+        // 显示卡片
+        document.getElementById('bridge-card').classList.remove('hidden');
+        document.getElementById('bridge-card').style.top = `${this.getBoundingClientRect().top + 50}px`;
+        document.getElementById('bridge-card').style.left = `${this.getBoundingClientRect().left}px`;
+      });
+    });
+    
+    // 点击其他区域关闭卡片
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('[data-bridge]') && !e.target.closest('#bridge-card')) {
+        document.getElementById('bridge-card').classList.add('hidden');
+      }
+    });
+    
+    // AI风险预测趋势图
+    const riskTrendCtx = document.getElementById('riskTrendChart').getContext('2d');
+    const riskTrendChart = new Chart(riskTrendCtx, {
+      type: 'line',
+      data: {
+        labels: ['06/10', '06/11', '06/12', '06/13', '06/14', '06/15', '06/16', '06/17', '06/18'],
+        datasets: [{
+          label: '风险等级',
+          data: [3.2, 3.5, 3.8, 4.1, 4.5, 4.8, 5.2, 5.5, 5.7],
+          borderColor: '#FF9800',
+          backgroundColor: 'rgba(255, 152, 0, 0.1)',
+          tension: 0.4,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              display: false,
+              drawBorder: false
+            },
+            ticks: {
+              color: '#9CA3AF',
+              font: {
+                size: 10
+              }
+            }
+          },
+          y: {
+            grid: {
+              color: 'rgba(255, 255, 255, 0.1)',
+              drawBorder: false
+            },
+            ticks: {
+              color: '#9CA3AF',
+              font: {
+                size: 10
+              },
+              min: 0,
+              max: 10
+            }
+          }
+        }
+      }
+    });
+    
+    // 预警类型分布饼图
+    const alertTypeCtx = document.getElementById('alertTypeChart').getContext('2d');
+    const alertTypeChart = new Chart(alertTypeCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['溶洞风险', '裂缝扩大', '基础沉降', '其他'],
+        datasets: [{
+          data: [35, 25, 30, 10],
+          backgroundColor: [
+            '#FF9800',
+            '#F44336',
+            '#2196F3',
+            '#9E9E9E'
+          ],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              color: '#FFFFFF',
+              font: {
+                size: 10
+              },
+              padding: 10
+            }
+          }
+        },
+        cutout: '60%'
+      }
+    });
+  </script>
+</body>
+</html>
