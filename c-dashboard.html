@@ -92,8 +92,14 @@
   <div class="flex-1 flex flex-col max-w-md mx-auto w-full">
     <!-- 首页 - 查询页面 -->
     <div id="home-page" class="flex-1 flex flex-col p-6">
+      <!-- 顶部导航栏 -->
+      <div class="flex justify-end mt-4 mb-4">
+        <button id="logout-button" class="p-2 rounded-full bg-white card-shadow transition-all-300 hover:shadow-md">
+          <i class="fa fa-sign-out text-primary"></i>
+        </button>
+      </div>
       <!-- 顶部标题 -->
-      <div class="text-center mt-10 mb-12">
+      <div class="text-center mb-12">
         <div class="inline-block p-4 rounded-full bg-primary/10 mb-4">
           <i class="fa fa-bridge text-4xl text-primary"></i>
         </div>
@@ -342,10 +348,66 @@
       });
     }
     
-    // 返回按钮事件
-    document.getElementById('back-button').addEventListener('click', function() {
-      document.getElementById('result-page').classList.add('hidden');
-      document.getElementById('home-page').classList.remove('hidden');
+    // 返回按钮和退出登录按钮事件处理
+    document.addEventListener('DOMContentLoaded', function() {
+      // 添加日志以便调试
+      console.log('DOM已加载完成');
+      
+      // 返回按钮处理
+      const backButton = document.getElementById('back-button');
+      console.log('返回按钮元素:', backButton);
+      
+      if (backButton) {
+        // 添加更明确的点击效果
+        backButton.addEventListener('mousedown', function() {
+          this.classList.add('scale-95');
+        });
+        
+        backButton.addEventListener('mouseup', function() {
+          this.classList.remove('scale-95');
+        });
+        
+        backButton.addEventListener('click', function() {
+          console.log('返回按钮被点击');
+          const resultPage = document.getElementById('result-page');
+          const homePage = document.getElementById('home-page');
+          console.log('结果页元素:', resultPage);
+          console.log('首页元素:', homePage);
+          
+          if (resultPage && homePage) {
+            resultPage.classList.add('hidden');
+            homePage.classList.remove('hidden');
+            console.log('页面切换成功');
+          } else {
+            console.log('页面元素未找到');
+          }
+        });
+      }
+      
+      // 退出登录按钮处理
+      const logoutButton = document.getElementById('logout-button');
+      console.log('退出登录按钮元素:', logoutButton);
+      
+      if (logoutButton) {
+        // 添加点击效果
+        logoutButton.addEventListener('mousedown', function() {
+          this.classList.add('scale-95');
+        });
+        
+        logoutButton.addEventListener('mouseup', function() {
+          this.classList.remove('scale-95');
+        });
+        
+        // 退出登录功能
+        logoutButton.addEventListener('click', function() {
+          console.log('退出登录按钮被点击');
+          // 显示确认退出弹窗
+          if (confirm('确定要退出登录吗？')) {
+            // 确认后跳转到登录页面
+            window.location.href = 'index.html';
+          }
+        });
+      }
     });
     
     // 搜索框回车事件

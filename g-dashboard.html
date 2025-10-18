@@ -77,8 +77,8 @@
         <div class="text-sm text-gray-300">当前登录</div>
         <div class="font-medium">贵州省交通厅</div>
       </div>
-      <button class="p-2 hover:bg-gray-700 rounded-full transition-colors">
-        <i class="fa fa-sign-out"></i>
+      <button id="logout-button" class="p-2 rounded-full bg-white card-shadow transition-all-300 hover:shadow-md">
+        <i class="fa fa-sign-out text-primary"></i>
       </button>
     </div>
   </header>
@@ -123,7 +123,7 @@
               <span class="text-xs bg-danger/30 px-2 py-1 rounded-full">危险</span>
             </div>
             <div class="text-gray-300 text-sm mt-1">基础沉降异常</div>
-            <div class="text-xs text-gray-400 mt-2">2023-06-15 14:35:22</div>
+            <div class="text-xs text-gray-400 mt-2">2025-10-18 14:35:22</div>
           </div>
           
           <div class="bg-warning/20 rounded-lg p-3 border border-warning/30">
@@ -132,7 +132,7 @@
               <span class="text-xs bg-warning/30 px-2 py-1 rounded-full">注意</span>
             </div>
             <div class="text-gray-300 text-sm mt-1">裂缝扩大</div>
-            <div class="text-xs text-gray-400 mt-2">2023-06-15 13:42:18</div>
+            <div class="text-xs text-gray-400 mt-2">2025-10-17 13:42:18</div>
           </div>
           
           <div class="bg-warning/20 rounded-lg p-3 border border-warning/30">
@@ -141,7 +141,7 @@
               <span class="text-xs bg-warning/30 px-2 py-1 rounded-full">注意</span>
             </div>
             <div class="text-gray-300 text-sm mt-1">溶洞风险</div>
-            <div class="text-xs text-gray-400 mt-2">2023-06-15 11:28:54</div>
+            <div class="text-xs text-gray-400 mt-2">2025-10-17 11:28:54</div>
           </div>
           
           <div class="bg-primary/60 rounded-lg p-3 border border-gray-700">
@@ -150,7 +150,7 @@
               <span class="text-xs bg-success/30 px-2 py-1 rounded-full">正常</span>
             </div>
             <div class="text-gray-300 text-sm mt-1">定期检查</div>
-            <div class="text-xs text-gray-400 mt-2">2023-06-15 10:15:36</div>
+            <div class="text-xs text-gray-400 mt-2">2025-10-16 10:15:36</div>
           </div>
         </div>
       </div>
@@ -220,7 +220,7 @@
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-gray-400">最后检测时间</span>
-            <span id="bridge-time" class="font-medium">2023-06-15 14:30</span>
+            <span id="bridge-time" class="font-medium">2025-10-18 14:30</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-gray-400">风险类型</span>
@@ -329,8 +329,8 @@
         statusClass: 'bg-success/30',
         score: 92,
         scoreClass: 'text-success',
-        time: '2023-06-15 14:30',
-        risk: '无'
+          time: '2025-10-18 14:30',
+          risk: '无'
       },
       bridge2: {
         name: '南明河大桥',
@@ -338,8 +338,8 @@
         statusClass: 'bg-warning/30',
         score: 75,
         scoreClass: 'text-warning',
-        time: '2023-06-15 13:45',
-        risk: '溶洞风险'
+          time: '2025-10-17 13:45',
+          risk: '溶洞风险'
       },
       bridge3: {
         name: '贵黄高速2号桥',
@@ -347,8 +347,8 @@
         statusClass: 'bg-danger/30',
         score: 45,
         scoreClass: 'text-danger',
-        time: '2023-06-15 14:35',
-        risk: '基础沉降异常'
+          time: '2025-10-16 14:35',
+          risk: '基础沉降异常'
       },
       bridge4: {
         name: '观山湖大桥',
@@ -356,8 +356,8 @@
         statusClass: 'bg-success/30',
         score: 95,
         scoreClass: 'text-success',
-        time: '2023-06-15 14:20',
-        risk: '无'
+          time: '2025-10-15 14:20',
+          risk: '无'
       }
     };
     
@@ -477,6 +477,35 @@
           }
         },
         cutout: '60%'
+      }
+    });
+    
+    // 退出登录按钮事件处理
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('DOM已加载完成');
+      
+      const logoutButton = document.getElementById('logout-button');
+      console.log('退出登录按钮元素:', logoutButton);
+      
+      if (logoutButton) {
+        // 添加点击效果
+        logoutButton.addEventListener('mousedown', function() {
+          this.classList.add('scale-95');
+        });
+        
+        logoutButton.addEventListener('mouseup', function() {
+          this.classList.remove('scale-95');
+        });
+        
+        // 退出登录功能
+        logoutButton.addEventListener('click', function() {
+          console.log('退出登录按钮被点击');
+          // 显示确认退出弹窗
+          if (confirm('确定要退出登录吗？')) {
+            // 确认后跳转到登录页面
+            window.location.href = 'index.html';
+          }
+        });
       }
     });
   </script>

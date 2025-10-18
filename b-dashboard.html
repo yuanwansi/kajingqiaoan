@@ -90,9 +90,12 @@
           <div class="ml-3 relative">
             <div class="flex items-center">
               <span class="mr-2 font-medium">贵州桥梁养护工程有限公司</span>
-              <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
+              <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center mr-2">
                 <span class="text-gray-600 text-sm">贵养</span>
               </div>
+              <button id="logout-button" class="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-600" title="退出登录">
+                <i class="fa fa-sign-out"></i>
+              </button>
             </div>
           </div>
         </div>
@@ -182,7 +185,7 @@
             <h3 class="text-sm font-medium text-gray-500">最后检测时间</h3>
           </div>
           <div class="mt-2">
-            <span class="text-xl font-bold">2023-06-15</span>
+            <span class="text-xl font-bold">2025-10-18</span>
             <div class="text-gray-500 text-sm">14:35:22</div>
           </div>
         </div>
@@ -485,6 +488,29 @@
     document.getElementById('bridge-selector').addEventListener('change', function() {
       alert('已切换到新桥梁，数据正在加载...');
       // 这里可以添加实际的数据切换逻辑
+    });
+    
+    // 登出按钮事件处理
+    document.addEventListener('DOMContentLoaded', function() {
+      const logoutButton = document.getElementById('logout-button');
+      if (logoutButton) {
+        logoutButton.addEventListener('click', function() {
+          // 显示确认对话框
+          if (confirm('确定要退出登录吗？')) {
+            // 跳转到登录页面
+            window.location.href = 'index.html';
+          }
+        });
+        
+        // 添加视觉反馈效果
+        logoutButton.addEventListener('mousedown', function() {
+          this.classList.add('scale-95');
+        });
+        
+        logoutButton.addEventListener('mouseup', function() {
+          this.classList.remove('scale-95');
+        });
+      }
     });
   </script>
 </body>
