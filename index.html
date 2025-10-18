@@ -87,7 +87,6 @@
             <option value="">请选择用户类型</option>
             <option value="g">政府交通管理部门 (G端)</option>
             <option value="b">桥梁养护公司 (B端)</option>
-            <option value="insurance">保险机构</option>
             <option value="c">公众用户 (C端)</option>
           </select>
         </div>
@@ -133,9 +132,7 @@
         case 'c':
           window.location.href = 'c-dashboard.html';
           break;
-        case 'insurance':
-          window.location.href = 'b-dashboard.html';
-          break;
+
         default:
           alert('请选择用户类型');
       }
