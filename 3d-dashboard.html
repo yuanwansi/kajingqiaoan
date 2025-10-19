@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>桥梁3D数字孪生模型 - 智能监测系统</title>
+  <title>预应力混凝土连续箱梁桥 - 3D数字孪生模型</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Font Awesome -->
@@ -12,533 +12,608 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
   <!-- Three.js -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-  <!-- 内联OrbitControls简化实现 -->
+  <!-- Three.js OrbitControls -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+  
+  <!-- 备用OrbitControls实现，防止CDN加载失败 -->
   <script>
-    // 简化版OrbitControls实现
-    class OrbitControls {
-      constructor(camera, domElement) {
+    // 简化版OrbitControls实现，用于在CDN加载失败时提供备用功能
+    if (typeof THREE.OrbitControls === 'undefined') {
+      THREE.OrbitControls = function(camera, domElement) {
         this.camera = camera;
         this.domElement = domElement;
         this.enableDamping = true;
         this.dampingFactor = 0.05;
+        this.screenSpacePanning = false;
+        this.minDistance = 50;
+        this.maxDistance = 500;
+        this.minPolarAngle = 0;
+        this.maxPolarAngle = Math.PI / 2;
+        // 降低鼠标交互灵敏度参数
+        this.rotateSpeed = 0.05;  // 进一步降低旋转速度
+        this.zoomSpeed = 0.5;
+        this.panSpeed = 0.5;
         
-        // 控制状态
-        this._state = 'none';
-        this._prevState = { x: 0, y: 0 };
+        // 内部状态
+        const scope = this;
+        let spherical = new THREE.Spherical();
+        let sphericalDelta = new THREE.Spherical();
+        let scale = 1;
+        let panOffset = new THREE.Vector3();
+        let isRotating = false;
+        let isPanning = false;
+        let isZooming = false;
+        let rotateStart = new THREE.Vector2();
+        let rotateEnd = new THREE.Vector2();
+        let rotateDelta = new THREE.Vector2();
+        let panStart = new THREE.Vector2();
+        let panEnd = new THREE.Vector2();
+        let panDelta = new THREE.Vector2();
+        let zoomStart = new THREE.Vector2();
+        let zoomEnd = new THREE.Vector2();
+        let zoomDelta = new THREE.Vector2();
+        // 将target作为实例属性暴露
+        this.target = new THREE.Vector3(0, 15, 0);
+        // 为了兼容性，添加getTarget和setTarget方法
+        this.getTarget = function() { return scope.target; };
+        this.setTarget = function(x, y, z) { 
+          if (x.isVector3) {
+            scope.target.copy(x);
+          } else {
+            scope.target.set(x, y, z);
+          }
+        };
         
-        // 相机参数
-        this._spherical = { radius: 30, phi: Math.PI/3, theta: 0 };
-        this._target = { x: 0, y: 0, z: 0 };
-        
-        // 事件绑定
-        this._onMouseDown = this._onMouseDown.bind(this);
-        this._onMouseMove = this._onMouseMove.bind(this);
-        this._onMouseUp = this._onMouseUp.bind(this);
-        this._onWheel = this._onWheel.bind(this);
-        
-        this.domElement.addEventListener('mousedown', this._onMouseDown);
-        this.domElement.addEventListener('wheel', this._onWheel);
-      }
-      
-      _onMouseDown(event) {
-        this._state = 'rotate';
-        this._prevState = { x: event.clientX, y: event.clientY };
-        document.addEventListener('mousemove', this._onMouseMove);
-        document.addEventListener('mouseup', this._onMouseUp);
-      }
-      
-      _onMouseMove(event) {
-        if (this._state !== 'rotate') return;
-        
-        const deltaX = event.clientX - this._prevState.x;
-        const deltaY = event.clientY - this._prevState.y;
-        
-        this._spherical.theta -= deltaX * 0.01;
-        this._spherical.phi -= deltaY * 0.01;
-        this._spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, this._spherical.phi));
-        
-        this._updateCamera();
-        
-        this._prevState = { x: event.clientX, y: event.clientY };
-      }
-      
-      _onMouseUp() {
-        this._state = 'none';
-        document.removeEventListener('mousemove', this._onMouseMove);
-        document.removeEventListener('mouseup', this._onMouseUp);
-      }
-      
-      _onWheel(event) {
-        event.preventDefault();
-        const delta = event.deltaY > 0 ? 1.1 : 0.9;
-        this._spherical.radius *= delta;
-        this._spherical.radius = Math.max(10, Math.min(100, this._spherical.radius));
-        this._updateCamera();
-      }
-      
-      _updateCamera() {
-        const x = this._spherical.radius * Math.sin(this._spherical.phi) * Math.cos(this._spherical.theta);
-        const y = this._spherical.radius * Math.cos(this._spherical.phi);
-        const z = this._spherical.radius * Math.sin(this._spherical.phi) * Math.sin(this._spherical.theta);
-        
-        this.camera.position.set(x, y, z);
-        this.camera.lookAt(this._target.x, this._target.y, this._target.z);
-      }
-      
-      update() {
-        // 在启用阻尼的情况下可以添加平滑效果
-        if (this.enableDamping) {
-          // 简化实现，实际中需要更复杂的插值
+        // 计算从球面坐标到目标的位置
+        function updatePosition() {
+          const offset = new THREE.Vector3();
+          offset.setFromSpherical(spherical);
+          offset.applyQuaternion(camera.quaternion);
+          camera.position.copy(scope.target).add(offset);
+          camera.lookAt(scope.target);
         }
-      }
-      
-      reset() {
-        this._spherical = { radius: 30, phi: Math.PI/3, theta: 0 };
-        this._updateCamera();
-      }
+        
+        // 事件处理
+        function onContextMenu(event) {
+          event.preventDefault();
+        }
+        
+        function onMouseDown(event) {
+          if (event.button === 0) {
+            isRotating = true;
+            rotateStart.set(event.clientX, event.clientY);
+          } else if (event.button === 1) {
+            isPanning = true;
+            panStart.set(event.clientX, event.clientY);
+          }
+        }
+        
+        function onMouseMove(event) {
+          if (isRotating) {
+            rotateEnd.set(event.clientX, event.clientY);
+            rotateDelta.subVectors(rotateEnd, rotateStart);
+            
+            const element = scope.domElement;
+            sphericalDelta.theta -= 2 * Math.PI * rotateDelta.x / element.clientWidth * scope.rotateSpeed;
+            sphericalDelta.phi -= 2 * Math.PI * rotateDelta.y / element.clientHeight * scope.rotateSpeed;
+            
+            rotateStart.copy(rotateEnd);
+            
+            spherical.theta += sphericalDelta.theta;
+            spherical.phi += sphericalDelta.phi;
+            spherical.phi = Math.max(scope.minPolarAngle, Math.min(scope.maxPolarAngle, spherical.phi));
+            
+            updatePosition();
+          } else if (isPanning) {
+            panEnd.set(event.clientX, event.clientY);
+            panDelta.subVectors(panEnd, panStart);
+            
+            const element = scope.domElement;
+            const offset = new THREE.Vector3();
+            const position = camera.position.clone();
+            const offsetPosition = position.clone().sub(scope.target);
+            const targetDistance = offsetPosition.length();
+            
+            const panLeft = new THREE.Vector3();
+            panLeft.crossVectors(camera.up, camera.position);
+            panLeft.normalize();
+            panLeft.multiplyScalar(-2 * Math.PI * panDelta.x * targetDistance / element.clientWidth * scope.panSpeed);
+            
+            const panUp = new THREE.Vector3();
+            panUp.copy(camera.up);
+            panUp.normalize();
+            panUp.multiplyScalar(2 * Math.PI * panDelta.y * targetDistance / element.clientHeight * scope.panSpeed);
+            
+            offset.addVectors(panLeft, panUp);
+            scope.target.add(offset);
+            
+            panStart.copy(panEnd);
+            
+            updatePosition();
+          }
+        }
+        
+        function onMouseUp() {
+          isRotating = false;
+          isPanning = false;
+        }
+        
+        function onWheel(event) {
+          event.preventDefault();
+          const delta = event.deltaY > 0 ? 1 : -1;
+          scale *= 1 + delta * 0.1 * scope.zoomSpeed;
+          scale = Math.max(scope.minDistance / camera.position.distanceTo(scope.target), Math.min(scope.maxDistance / camera.position.distanceTo(scope.target), scale));
+          
+          const offset = new THREE.Vector3();
+          offset.copy(camera.position).sub(scope.target);
+          offset.multiplyScalar(scale);
+          camera.position.copy(scope.target).add(offset);
+        }
+        
+        // 绑定事件
+        domElement.addEventListener('contextmenu', onContextMenu);
+        domElement.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+        domElement.addEventListener('wheel', onWheel);
+        
+        // 公共方法
+        this.update = function() {
+          if (scope.enableDamping) {
+            sphericalDelta.theta *= (1 - scope.dampingFactor);
+            sphericalDelta.phi *= (1 - scope.dampingFactor);
+          } else {
+            sphericalDelta.set(0, 0, 0);
+          }
+        };
+        
+        this.dispose = function() {
+          domElement.removeEventListener('contextmenu', onContextMenu);
+          domElement.removeEventListener('mousedown', onMouseDown);
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+          domElement.removeEventListener('wheel', onWheel);
+        };
+        
+        // 初始化相机位置
+        const offset = new THREE.Vector3();
+        offset.copy(camera.position).sub(this.target);
+        spherical.setFromVector3(offset);
+        
+        updatePosition();
+      };
     }
-    
-    // 将OrbitControls添加到THREE命名空间
-    THREE.OrbitControls = OrbitControls;
   </script>
   
-  <!-- Tailwind配置 -->
+  <!-- Tailwind 配置 -->
   <script>
     tailwind.config = {
       theme: {
         extend: {
           colors: {
-            primary: '#0F172A',
-            secondary: '#1E293B',
-            accent: '#06B6D4',
-            accentLight: '#22D3EE',
-            danger: '#EF4444',
-            warning: '#FACC15',
-            success: '#10B981',
-            dark: '#020617'
+            primary: '#0F172A', // 深蓝灰色背景
+            secondary: '#1E293B', // 次要背景色
+            accent: '#06B6D4', // 亮蓝色强调色
+            success: '#10B981', // 绿色（健康状态）
+            warning: '#FACC15', // 黄色（警告）
+            danger: '#EF4444', // 红色（危险）
+            info: '#0EA5E9', // 信息蓝色
+            // 病害颜色变量
+            crack: '#FF0000',     // 裂缝红色
+            deformation: '#00A2FF', // 位移变形蓝色
+            bearing: '#FFCC00',   // 支座黄色
+            spalling: '#AAAAAA',  // 表面病害灰色
+            rust: '#FF6600',      // 钢筋锈蚀橙色
+            concrete: '#E0E0E0',  // 混凝土素模颜色
           },
           fontFamily: {
-            inter: ['Inter', 'system-ui', 'sans-serif']
+            inter: ['Inter', 'sans-serif'],
           },
           animation: {
             'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-            'float': 'float 3s ease-in-out infinite'
+            'float': 'float 3s ease-in-out infinite',
+            'blink': 'blink 1.5s infinite',
           },
           keyframes: {
             float: {
               '0%, 100%': { transform: 'translateY(0)' },
-              '50%': { transform: 'translateY(-10px)' }
-            }
-          }
-        }
+              '50%': { transform: 'translateY(-10px)' },
+            },
+            blink: {
+              '0%, 50%': { opacity: 1 },
+              '51%, 100%': { opacity: 0.3 },
+            },
+          },
+        },
       }
     }
   </script>
   
-  <!-- 自定义样式 -->
   <style type="text/tailwindcss">
     @layer utilities {
-      .text-shadow-glow {
-        text-shadow: 0 0 10px currentColor;
-      }
-      .glass-effect {
-        background: rgba(15, 23, 42, 0.6);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-      }
-      .neon-border {
-        border: 1px solid rgba(6, 182, 212, 0.2);
-        box-shadow: 0 0 10px rgba(6, 182, 212, 0.1);
-      }
-      .grid-pattern {
-        background-image: 
-          linear-gradient(rgba(6, 182, 212, 0.1) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(6, 182, 212, 0.1) 1px, transparent 1px);
-        background-size: 20px 20px;
-      }
-      .scrollbar-hide::-webkit-scrollbar {
-        display: none;
+      .content-auto {
+        content-visibility: auto;
       }
       .scrollbar-hide {
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
-      .card-hover-effect {
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      .glass-effect {
+        backdrop-filter: blur(8px);
+        background-color: rgba(15, 23, 42, 0.7);
+      }
+      .text-shadow {
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+      .card-hover {
         transition: all 0.3s ease;
       }
-      .card-hover-effect:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 25px -5px rgba(6, 182, 212, 0.2);
+      .card-hover:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px -5px rgba(6, 182, 212, 0.1);
       }
-      .control-panel {
-        background: rgba(15, 23, 42, 0.8);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-      }
-      .time-slider::-webkit-slider-thumb {
-        appearance: none;
-        width: 16px;
-        height: 16px;
-        background: #06B6D4;
-        border-radius: 50%;
-        cursor: pointer;
-        box-shadow: 0 0 10px #06B6D4;
-      }
-      .heatmap-gradient {
-        background: linear-gradient(to right, #10B981, #FACC15, #EF4444);
+      .crack-blink {
+        animation: blink 1.5s infinite;
       }
     }
   </style>
 </head>
-<body class="bg-dark text-gray-200 font-inter min-h-screen flex flex-col">
+<body class="bg-primary font-inter text-gray-100 min-h-screen flex flex-col">
   <!-- 顶部标题栏 -->
-  <header class="bg-primary/80 backdrop-blur-md border-b border-gray-700/50 py-3 px-6 flex items-center justify-between">
-    <div class="flex items-center">
-      <div class="text-accent text-2xl mr-3">
-        <i class="fa fa-bridge"></i>
-      </div>
-      <h1 class="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-accent to-accentLight">智能桥梁监测系统</h1>
+  <header class="bg-secondary/80 border-b border-gray-700/50 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+    <div class="flex items-center space-x-3">
+      <i class="fa fa-bridge fa-2x text-accent"></i>
+      <h1 class="text-xl font-bold text-white">喀斯特山谷吊索桥 - 健康监测系统</h1>
     </div>
-    <div class="flex items-center space-x-4">
-      <div class="text-sm text-gray-400">
-        <span id="current-time">--:--:--</span>
+    
+    <div class="flex items-center space-x-6">
+      <div class="flex items-center space-x-2 text-sm text-gray-300">
+        <i class="fa fa-calendar-o text-accent"></i>
+        <span id="current-date">2024-10-18</span>
       </div>
-      <button id="logout-button" class="text-gray-400 hover:text-white transition-colors">
-        <i class="fa fa-sign-out"></i>
-      </button>
+      
+      <div class="flex items-center space-x-2 text-sm text-gray-300">
+        <i class="fa fa-clock-o text-accent"></i>
+        <span id="current-time">14:35:22</span>
+      </div>
+      
+      <div class="flex items-center space-x-3">
+        <div class="h-8 w-8 rounded-full bg-accent/20 flex items-center justify-center text-accent">
+          <i class="fa fa-user"></i>
+        </div>
+        <button id="logout-button" class="text-sm text-gray-300 hover:text-accent transition-colors">
+          退出登录
+        </button>
+      </div>
     </div>
   </header>
 
-  <!-- 主内容区域 -->
-  <main class="flex-1 flex flex-col p-4 lg:flex-row">
+  <!-- 主要内容区域 -->
+  <main class="flex flex-1 overflow-hidden">
     <!-- 左侧控制面板 -->
-    <div class="lg:w-64 glass-effect border-r border-gray-700/50 p-4 rounded-lg mb-4 lg:mb-0">
-      <!-- 桥梁选择器 -->
-      <div class="mb-6">
-        <label class="block text-xs text-gray-400 mb-2">选择桥梁</label>
-        <select id="bridge-selector" class="w-full bg-secondary/50 border border-gray-700/50 rounded p-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-accent">
-          <option value="bridge1">长江大桥</option>
-          <option value="bridge2">黄河大桥</option>
-          <option value="bridge3">珠江大桥</option>
-          <option value="bridge4">松花江大桥</option>
-        </select>
-      </div>
-      
-      <!-- 功能控制区 -->
-      <div class="mb-6">
-        <h3 class="text-sm font-medium text-gray-300 mb-3">功能控制面板</h3>
-        
-        <!-- 病害演变时间轴控制 -->
-        <div class="mb-4">
-          <div class="flex justify-between items-center mb-2">
-            <label class="text-xs text-gray-400">病害演变回放</label>
-            <div class="flex space-x-1">
-              <button id="play-btn" class="text-xs text-accent hover:text-accentLight p-1 rounded" title="播放">
-                <i class="fa fa-play"></i>
-              </button>
-              <button id="pause-btn" class="text-xs text-accent hover:text-accentLight p-1 rounded" title="暂停">
-                <i class="fa fa-pause"></i>
-              </button>
-              <button id="reset-btn" class="text-xs text-accent hover:text-accentLight p-1 rounded" title="重置">
-                <i class="fa fa-refresh"></i>
-              </button>
+    <aside class="w-72 bg-secondary/80 border-r border-gray-700/50 flex flex-col">
+      <!-- 桥梁信息卡片 -->
+      <div class="p-4 border-b border-gray-700/50">
+        <div class="bg-primary/50 rounded-lg p-3 mb-4">
+          <h3 class="text-lg font-semibold text-accent mb-2">喀斯特山谷吊索桥</h3>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="text-gray-400">类型:</span>
+              <span>双塔双索面吊索桥</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">总长:</span>
+              <span>260米</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">跨径布置:</span>
+              <span>70m + 120m + 70m</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">索塔高度:</span>
+              <span>80米</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">健康评分:</span>
+              <span class="text-yellow-400 font-medium">85/100</span>
             </div>
           </div>
-          <div class="relative">
-            <input type="range" id="time-slider" min="0" max="100" value="0" class="w-full bg-gray-700/50 h-1 rounded-full appearance-none cursor-pointer time-slider">
-            <div id="time-label" class="absolute -bottom-6 left-0 text-xs text-accent">2024-01-01</div>
-          </div>
-          <div class="flex justify-between text-xs text-gray-500 mt-1">
-            <span>2024-01-01</span>
-            <span>2024-12-31</span>
+        </div>
+      </div>
+
+      <!-- 显示控制 -->
+      <div class="p-4 border-b border-gray-700/50">
+        <h3 class="text-sm font-semibold text-gray-300 mb-3">显示模式</h3>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="normal-mode" class="bg-accent/10 text-accent border border-accent/30 rounded p-2 text-xs flex flex-col items-center justify-center">
+            <i class="fa fa-eye mb-1"></i>
+            <span>标准视图</span>
+          </button>
+          <button id="stress-mode" class="bg-gray-800 text-gray-400 border border-gray-700/50 rounded p-2 text-xs flex flex-col items-center justify-center">
+            <i class="fa fa-tachometer mb-1"></i>
+            <span>应力分布</span>
+          </button>
+          <button id="defect-mode" class="bg-gray-800 text-gray-400 border border-gray-700/50 rounded p-2 text-xs flex flex-col items-center justify-center">
+            <i class="fa fa-exclamation-triangle mb-1"></i>
+            <span>病害标注</span>
+          </button>
+          <button id="section-mode" class="bg-gray-800 text-gray-400 border border-gray-700/50 rounded p-2 text-xs flex flex-col items-center justify-center">
+            <i class="fa fa-cut mb-1"></i>
+            <span>断面视图</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 透明度控制 -->
+      <div class="p-4 border-b border-gray-700/50">
+        <h3 class="text-sm font-semibold text-gray-300 mb-3">透明度控制</h3>
+        <div class="space-y-3">
+          <div class="flex flex-col">
+            <div class="flex justify-between text-xs text-gray-400 mb-1">
+              <span>结构透明度</span>
+              <span id="opacity-value">80%</span>
+            </div>
+            <input type="range" id="opacity-slider" min="10" max="100" value="80" 
+                  class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer">
           </div>
         </div>
-        
-        <!-- 显示模式切换 -->
-        <div class="mb-4">
-          <label class="text-xs text-gray-400 block mb-2">显示模式</label>
-          <div class="grid grid-cols-2 gap-2">
-            <button id="stress-mode" class="text-xs bg-accent/10 text-accent border border-accent/30 rounded p-2 transition-all hover:bg-accent/20">
-              应力分布
-            </button>
-            <button id="sensor-mode" class="text-xs bg-gray-800 text-gray-400 border border-gray-700/50 rounded p-2 transition-all hover:bg-gray-700/50">
-              传感器数据
-            </button>
-            <button id="health-mode" class="text-xs bg-gray-800 text-gray-400 border border-gray-700/50 rounded p-2 transition-all hover:bg-gray-700/50">
-              健康评分
-            </button>
-            <button id="normal-mode" class="text-xs bg-gray-800 text-gray-400 border border-gray-700/50 rounded p-2 transition-all hover:bg-gray-700/50">
-              标准视图
-            </button>
-          </div>
-        </div>
-        
-        <!-- 透明度控制 -->
-        <div class="mb-4">
-          <div class="flex justify-between items-center mb-2">
-            <label class="text-xs text-gray-400">可视化透明度</label>
-            <span id="opacity-value" class="text-xs text-accent">80%</span>
-          </div>
-          <input type="range" id="opacity-slider" min="10" max="100" value="80" class="w-full bg-gray-700/50 h-1 rounded-full appearance-none cursor-pointer time-slider">
-        </div>
-        
-        <!-- 病害点控制 -->
-        <div class="mb-4">
-          <label class="flex items-center justify-between text-xs text-gray-400">
-            <span>显示病害点</span>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" id="show-defects" class="sr-only peer" checked>
-              <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-accent peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
-            </label>
+      </div>
+
+      <!-- 病害显示控制 -->
+      <div class="p-4 border-b border-gray-700/50">
+        <h3 class="text-sm font-semibold text-gray-300 mb-3">病害显示</h3>
+        <div class="space-y-2">
+          <label class="flex items-center space-x-2 text-xs text-gray-300">
+            <input type="checkbox" id="show-cracks" checked class="rounded bg-gray-700 text-accent focus:ring-accent">
+            <span>裂缝</span>
+          </label>
+          <label class="flex items-center space-x-2 text-xs text-gray-300">
+            <input type="checkbox" id="show-deformation" checked class="rounded bg-gray-700 text-accent focus:ring-accent">
+            <span>位移变形</span>
+          </label>
+          <label class="flex items-center space-x-2 text-xs text-gray-300">
+            <input type="checkbox" id="show-bearings" checked class="rounded bg-gray-700 text-accent focus:ring-accent">
+            <span>支座病害</span>
+          </label>
+          <label class="flex items-center space-x-2 text-xs text-gray-300">
+            <input type="checkbox" id="show-spalling" checked class="rounded bg-gray-700 text-accent focus:ring-accent">
+            <span>表面病害</span>
+          </label>
+          <label class="flex items-center space-x-2 text-xs text-gray-300">
+            <input type="checkbox" id="show-rust" checked class="rounded bg-gray-700 text-accent focus:ring-accent">
+            <span>钢筋锈蚀</span>
           </label>
         </div>
-        
-        <!-- 传感器点控制 -->
-        <div class="mb-4">
-          <label class="flex items-center justify-between text-xs text-gray-400">
-            <span>显示传感器</span>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" id="show-sensors" class="sr-only peer" checked>
-              <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-accent peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
-            </label>
-          </label>
-        </div>
       </div>
-      
-      <!-- 图例 -->
-      <div class="mb-4">
-        <h3 class="text-sm font-medium text-gray-300 mb-2">图例说明</h3>
-        
-        <!-- 应力分布图例 -->
-        <div class="mb-3">
-          <h4 class="text-xs text-gray-400 mb-2">应力分布</h4>
-          <div class="heatmap-gradient h-2 rounded-full mb-1"></div>
-          <div class="flex justify-between text-xs text-gray-500">
-            <span>低应力</span>
-            <span>中等应力</span>
-            <span>高应力</span>
+
+      <!-- 图例说明 -->
+      <div class="p-4 border-b border-gray-700/50">
+        <h3 class="text-sm font-semibold text-gray-300 mb-3">图例说明</h3>
+        <div class="space-y-2">
+          <div class="flex items-center space-x-2 text-xs text-gray-300">
+            <div class="w-3 h-3 bg-crack rounded-full"></div>
+            <span>裂缝</span>
           </div>
-        </div>
-        
-        <!-- 健康评分图例 -->
-        <div class="mb-3">
-          <h4 class="text-xs text-gray-400 mb-2">健康评分</h4>
-          <div class="grid grid-cols-5 gap-1 mb-1">
-            <div class="h-3 bg-green-500 rounded-sm"></div>
-            <div class="h-3 bg-green-400 rounded-sm"></div>
-            <div class="h-3 bg-yellow-400 rounded-sm"></div>
-            <div class="h-3 bg-orange-400 rounded-sm"></div>
-            <div class="h-3 bg-red-500 rounded-sm"></div>
+          <div class="flex items-center space-x-2 text-xs text-gray-300">
+            <div class="w-3 h-3 bg-deformation rounded-full"></div>
+            <span>位移变形</span>
           </div>
-          <div class="flex justify-between text-xs text-gray-500">
-            <span>90-100</span>
-            <span>70-89</span>
-            <span>50-69</span>
-            <span>30-49</span>
-            <span>0-29</span>
+          <div class="flex items-center space-x-2 text-xs text-gray-300">
+            <div class="w-3 h-3 bg-bearing rounded-full"></div>
+            <span>支座病害</span>
           </div>
-        </div>
-        
-        <!-- 病害类型图例 -->
-        <div class="mb-3">
-          <h4 class="text-xs text-gray-400 mb-2">病害类型</h4>
-          <div class="space-y-1">
-            <div class="flex items-center text-xs text-gray-400">
-              <div class="w-3 h-3 bg-red-500 rounded-sm mr-1"></div>
-              <span>裂缝</span>
-            </div>
-            <div class="flex items-center text-xs text-gray-400">
-              <div class="w-3 h-3 bg-yellow-400 rounded-sm mr-1"></div>
-              <span>溶洞</span>
-            </div>
-            <div class="flex items-center text-xs text-gray-400">
-              <div class="w-3 h-3 bg-blue-500 rounded-sm mr-1"></div>
-              <span>钢筋锈蚀</span>
-            </div>
+          <div class="flex items-center space-x-2 text-xs text-gray-300">
+            <div class="w-3 h-3 bg-spalling rounded-full"></div>
+            <span>表面病害</span>
+          </div>
+          <div class="flex items-center space-x-2 text-xs text-gray-300">
+            <div class="w-3 h-3 bg-rust rounded-full"></div>
+            <span>钢筋锈蚀</span>
           </div>
         </div>
       </div>
-      
-      <!-- 快速导航菜单 -->
-      <div class="pt-4 border-t border-gray-700/50">
-        <h3 class="text-sm font-medium text-gray-300 mb-3">快速导航</h3>
-        <div class="space-y-1">
-          <a href="g-dashboard.html" class="flex items-center px-3 py-2 text-sm rounded-md text-gray-400 hover:bg-accent/10 hover:text-accent transition-colors">
-            <i class="fa fa-tachometer w-5 text-center mr-2"></i>
-            <span>总览仪表盘</span>
-          </a>
-          <a href="b-dashboard.html" class="flex items-center px-3 py-2 text-sm rounded-md text-gray-400 hover:bg-accent/10 hover:text-accent transition-colors">
-            <i class="fa fa-bar-chart w-5 text-center mr-2"></i>
-            <span>数据监测</span>
-          </a>
-          <a href="alert-management.html" class="flex items-center px-3 py-2 text-sm rounded-md text-gray-400 hover:bg-accent/10 hover:text-accent transition-colors">
-            <i class="fa fa-bell w-5 text-center mr-2"></i>
-            <span>预警管理</span>
-          </a>
-          <a href="3d-dashboard.html" class="flex items-center px-3 py-2 text-sm rounded-md bg-accent/10 text-accent">
-            <i class="fa fa-cube w-5 text-center mr-2"></i>
-            <span>3D数字孪生</span>
-          </a>
+
+      <!-- 快速导航 -->
+      <div class="p-4 border-b border-gray-700/50">
+        <h3 class="text-sm font-semibold text-gray-300 mb-3">快速导航</h3>
+        <div class="space-y-2">
+          <button id="view-main-pier" class="w-full text-left text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 p-2 rounded transition-colors">
+            主墩底部裂缝
+          </button>
+          <button id="view-beam-bottom" class="w-full text-left text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 p-2 rounded transition-colors">
+            箱梁底板裂缝
+          </button>
+          <button id="view-mid-span" class="w-full text-left text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 p-2 rounded transition-colors">
+            跨中变形区域
+          </button>
+          <button id="view-bearing" class="w-full text-left text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 p-2 rounded transition-colors">
+            支座病害
+          </button>
+          <button id="view-deck" class="w-full text-left text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 p-2 rounded transition-colors">
+            桥面病害
+          </button>
+          <button id="view-guardrail" class="w-full text-left text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 p-2 rounded transition-colors">
+            护栏锈蚀
+          </button>
+          <button id="view-section" class="w-full text-left text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 p-2 rounded transition-colors">
+            箱梁断面
+          </button>
         </div>
       </div>
-    </div>
-    
+
+      <!-- 数据分析入口 -->
+      <div class="p-4 mt-auto">
+        <button id="show-analysis" class="w-full bg-accent hover:bg-accent/90 text-white p-2 rounded text-sm transition-colors">
+          <i class="fa fa-bar-chart mr-2"></i>
+          查看数据分析
+        </button>
+      </div>
+    </aside>
+
     <!-- 右侧主显示区域 -->
-    <div class="flex-1 lg:ml-4">
-      <!-- 3D模型区域 -->
-      <div class="glass-effect rounded-lg p-4 neon-border mb-4">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500">桥梁3D数字孪生模型</h2>
-          <div class="flex space-x-2">
-            <button id="zoom-in" class="text-sm bg-accent/10 hover:bg-accent/20 text-accent border border-accent/30 px-3 py-1 rounded flex items-center transition-all">
-              <i class="fa fa-search-plus mr-1"></i> 放大
-            </button>
-            <button id="zoom-out" class="text-sm bg-accent/10 hover:bg-accent/20 text-accent border border-accent/30 px-3 py-1 rounded flex items-center transition-all">
-              <i class="fa fa-search-minus mr-1"></i> 缩小
-            </button>
-            <button id="reset-view" class="text-sm bg-accent/10 hover:bg-accent/20 text-accent border border-accent/30 px-3 py-1 rounded flex items-center transition-all">
-              <i class="fa fa-home mr-1"></i> 重置视图
-            </button>
+    <section class="flex-1 relative overflow-hidden">
+      <!-- 3D模型容器 -->
+      <div id="model-container" class="w-full h-full bg-primary/50 grid-pattern relative">
+        <!-- 加载指示器 -->
+        <div id="loading-indicator" class="absolute inset-0 flex items-center justify-center bg-primary/80 z-50">
+          <div class="flex flex-col items-center">
+            <div class="w-12 h-12 border-4 border-accent/30 border-t-accent rounded-full animate-spin mb-4"></div>
+            <p class="text-accent">加载3D模型中...</p>
           </div>
         </div>
-        
-        <!-- 3D模型容器 -->
-        <div class="relative h-[600px] bg-gray-900 rounded-lg overflow-hidden grid-pattern" id="model-container">
-          <!-- 加载指示器 -->
-          <div id="loading-indicator" class="absolute inset-0 flex flex-col items-center justify-center bg-dark/80 z-20">
-            <div class="w-16 h-16 border-4 border-gray-700 border-t-accent rounded-full animate-spin mb-4"></div>
-            <div class="text-accent">加载3D模型中...</div>
+
+        <!-- 控制器提示 -->
+        <div class="absolute bottom-4 left-4 bg-secondary/80 backdrop-blur-sm text-xs text-gray-300 p-2 rounded">
+          <div class="flex space-x-4">
+            <div><i class="fa fa-mouse-pointer mr-1"></i> 拖动旋转</div>
+            <div><i class="fa fa-search mr-1"></i> 滚轮缩放</div>
+            <div><i class="fa fa-hand-pointer-o mr-1"></i> 点击查看详情</div>
           </div>
-          
-          <!-- 3D控制器提示 -->
-          <div class="absolute bottom-4 left-4 glass-effect p-2 rounded z-10">
-            <div class="text-xs text-white">
-              <div class="mb-1"><i class="fa fa-arrows mr-1"></i> 鼠标拖拽: 旋转视图</div>
-              <div class="mb-1"><i class="fa fa-search mr-1"></i> 鼠标滚轮: 缩放视图</div>
-              <div><i class="fa fa-hand-paper-o mr-1"></i> 右键拖拽: 平移视图</div>
+        </div>
+
+        <!-- 信息提示框 -->
+        <div id="info-tooltip" class="hidden absolute z-30 bg-secondary/90 backdrop-blur-sm text-xs text-gray-200 p-3 rounded shadow-lg max-w-xs">
+          <div id="tooltip-title" class="font-semibold text-accent mb-2"></div>
+          <div id="tooltip-content" class="space-y-1"></div>
+        </div>
+
+        <!-- 桥梁信息卡片 -->
+        <div class="absolute top-4 right-4 bg-secondary/80 backdrop-blur-sm border border-gray-700/50 rounded-lg p-3 text-sm max-w-xs">
+          <h3 class="font-semibold text-accent mb-2">实时监测</h3>
+          <div class="space-y-2">
+            <div class="flex justify-between items-center">
+              <span class="text-gray-400">环境温度:</span>
+              <span>22.5°C</span>
             </div>
-          </div>
-          
-          <!-- 信息提示框 -->
-          <div id="info-tooltip" class="hidden absolute glass-effect p-3 rounded-md z-10 max-w-xs">
-            <h4 id="tooltip-title" class="text-accent font-medium mb-1"></h4>
-            <div id="tooltip-content" class="text-xs text-gray-300 space-y-1"></div>
-          </div>
-          
-          <!-- 桥梁信息卡片 -->
-          <div id="bridge-info" class="absolute top-4 right-4 glass-effect p-3 rounded-md z-10 w-64">
-            <h4 class="text-accent font-medium mb-2">长江大桥</h4>
-            <div class="text-xs text-gray-300 space-y-2">
-              <div class="flex justify-between">
-                <span class="text-gray-400">健康评分:</span>
-                <span class="text-yellow-400 font-medium">68/100</span>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-400">湿度:</span>
+              <span>65%</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-400">风速:</span>
+              <span>3.2 m/s</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-400">振动频率:</span>
+              <span>0.42 Hz</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-400">跨中位移:</span>
+              <span class="text-yellow-400">18.5 mm</span>
+            </div>
+            <div class="pt-2 border-t border-gray-700/50">
+              <div class="flex justify-between text-xs mb-1">
+                <span class="text-gray-400">健康状态</span>
+                <span class="text-success">良好</span>
               </div>
-              <div class="flex justify-between">
-                <span class="text-gray-400">检测时间:</span>
-                <span>2024-10-18 14:35</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-400">病害数量:</span>
-                <span>12处</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-400">风险等级:</span>
-                <span class="text-yellow-400">警告</span>
+              <div class="w-full bg-gray-700/50 rounded-full h-1.5">
+                <div class="bg-success h-1.5 rounded-full" style="width: 82%"></div>
               </div>
             </div>
           </div>
         </div>
       </div>
-      
-      <!-- 数据分析区域 -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- 病害演变趋势图 -->
-        <div class="glass-effect rounded-lg p-4 card-hover-effect neon-border">
+
+      <!-- 详细信息模态框 -->
+      <div id="detail-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-secondary border border-gray-700/50 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-auto">
           <div class="flex justify-between items-center mb-4">
-            <h3 class="font-bold text-teal-400">病害演变趋势</h3>
-            <div class="text-xs text-gray-400">最近12个月</div>
+            <h3 id="modal-title" class="text-lg font-semibold text-white"></h3>
+            <button id="close-modal" class="text-gray-400 hover:text-white transition-colors">
+              <i class="fa fa-times text-xl"></i>
+            </button>
           </div>
-          <div class="h-[250px]">
+          <div id="modal-content" class="text-sm"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 数据分析区域 -->
+  <div id="analysis-panel" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center">
+    <div class="bg-secondary border border-gray-700/50 rounded-lg p-6 max-w-5xl w-full max-h-[90vh] overflow-auto">
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="text-xl font-semibold text-white">数据分析报告</h3>
+        <button id="close-analysis" class="text-gray-400 hover:text-white transition-colors">
+          <i class="fa fa-times text-xl"></i>
+        </button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- 病害演变趋势图 -->
+        <div class="bg-primary/50 rounded-lg p-4">
+          <h4 class="text-sm font-medium text-accent mb-3">病害演变趋势</h4>
+          <div class="h-[300px]">
             <canvas id="defectTrendChart"></canvas>
           </div>
         </div>
-        
-        <!-- 应力分布统计 -->
-        <div class="glass-effect rounded-lg p-4 card-hover-effect neon-border">
-          <div class="flex justify-between items-center mb-4">
-            <h3 class="font-bold text-teal-400">应力分布统计</h3>
-            <div class="text-xs text-gray-400">各区域应力占比</div>
-          </div>
-          <div class="h-[250px]">
+        <!-- 应力分布统计图 -->
+        <div class="bg-primary/50 rounded-lg p-4">
+          <h4 class="text-sm font-medium text-accent mb-3">应力分布统计</h4>
+          <div class="h-[300px]">
             <canvas id="stressDistributionChart"></canvas>
           </div>
         </div>
       </div>
-    </div>
-  </main>
-
-  <!-- 模态框 - 详细信息 -->
-  <div id="detail-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden">
-    <div class="glass-effect border border-gray-700/50 rounded-lg p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto">
-      <div class="flex justify-between items-center mb-6">
-        <h3 id="modal-title" class="text-xl font-bold text-accent">病害详细信息</h3>
-        <button id="close-modal" class="text-gray-400 hover:text-white">
-          <i class="fa fa-times text-xl"></i>
-        </button>
-      </div>
-      
-      <div id="modal-content" class="space-y-6">
-        <!-- 模态框内容将通过JavaScript动态填充 -->
+      <div class="mt-6 space-y-4">
+        <h4 class="text-sm font-medium text-accent">关键监测数据</h4>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="bg-primary/50 rounded-lg p-3 text-center">
+            <div class="text-2xl font-semibold text-yellow-400 mb-1">18.5 mm</div>
+            <div class="text-xs text-gray-400">跨中最大位移</div>
+          </div>
+          <div class="bg-primary/50 rounded-lg p-3 text-center">
+            <div class="text-2xl font-semibold text-danger mb-1">3.2 mm</div>
+            <div class="text-xs text-gray-400">最大裂缝宽度</div>
+          </div>
+          <div class="bg-primary/50 rounded-lg p-3 text-center">
+            <div class="text-2xl font-semibold text-success mb-1">2.8 MPa</div>
+            <div class="text-xs text-gray-400">混凝土主应力</div>
+          </div>
+          <div class="bg-primary/50 rounded-lg p-3 text-center">
+            <div class="text-2xl font-semibold text-info mb-1">82/100</div>
+            <div class="text-xs text-gray-400">结构健康指数</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
-    // 初始化时间显示
-    function updateCurrentTime() {
+    // 初始化时间和日期显示
+    function updateDateTime() {
       const now = new Date();
-      const hours = now.getHours().toString().padStart(2, '0');
-      const minutes = now.getMinutes().toString().padStart(2, '0');
-      const seconds = now.getSeconds().toString().padStart(2, '0');
-      document.getElementById('current-time').textContent = `${hours}:${minutes}:${seconds}`;
+      document.getElementById('current-date').textContent = now.toISOString().split('T')[0];
+      document.getElementById('current-time').textContent = now.toTimeString().split(' ')[0];
     }
-    setInterval(updateCurrentTime, 1000);
-    updateCurrentTime();
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
 
     // 初始化图表
     function initCharts() {
       // 病害演变趋势图
-      const defectCtx = document.getElementById('defectTrendChart').getContext('2d');
-      new Chart(defectCtx, {
+      const defectTrendCtx = document.getElementById('defectTrendChart').getContext('2d');
+      new Chart(defectTrendCtx, {
         type: 'line',
         data: {
-          labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
-          datasets: [
-            {
-              label: '裂缝数量',
-              data: [2, 3, 4, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-              borderColor: '#EF4444',
-              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-              tension: 0.4,
-              fill: true
-            },
-            {
-              label: '溶洞数量',
-              data: [1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4],
-              borderColor: '#FACC15',
-              backgroundColor: 'rgba(250, 204, 21, 0.1)',
-              tension: 0.4,
-              fill: true
-            },
-            {
-              label: '钢筋锈蚀点',
-              data: [0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4],
-              borderColor: '#3B82F6',
-              backgroundColor: 'rgba(59, 130, 246, 0.1)',
-              tension: 0.4,
-              fill: true
-            }
-          ]
+          labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月'],
+          datasets: [{
+            label: '跨中位移(mm)',
+            data: [12.5, 13.2, 14.1, 14.8, 15.5, 16.2, 16.8, 17.5, 18.2, 18.5],
+            borderColor: '#06B6D4',
+            backgroundColor: 'rgba(6, 182, 212, 0.1)',
+            tension: 0.4,
+            fill: true
+          }, {
+            label: '最大裂缝宽度(mm)',
+            data: [0.8, 1.2, 1.5, 1.8, 2.2, 2.5, 2.8, 3.0, 3.1, 3.2],
+            borderColor: '#EF4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            tension: 0.4,
+            fill: true
+          }]
         },
         options: {
           responsive: true,
@@ -547,13 +622,11 @@
             tooltip: {
               backgroundColor: 'rgba(15, 23, 42, 0.9)',
               titleColor: '#06B6D4',
-              bodyColor: '#fff',
-              borderColor: '#06B6D4',
-              borderWidth: 1
+              bodyColor: '#fff'
             },
             legend: {
               labels: {
-                color: '#E2E8F0'
+                color: '#94A3B8'
               }
             }
           },
@@ -578,25 +651,28 @@
           }
         }
       });
-      
-      // 应力分布统计
-      const stressCtx = document.getElementById('stressDistributionChart').getContext('2d');
-      new Chart(stressCtx, {
-        type: 'doughnut',
+
+      // 应力分布统计图
+      const stressDistributionCtx = document.getElementById('stressDistributionChart').getContext('2d');
+      new Chart(stressDistributionCtx, {
+        type: 'bar',
         data: {
-          labels: ['低应力区域', '中等应力区域', '高应力区域', '危险应力区域'],
+          labels: ['主梁跨中', '主墩顶部', '主墩底部', '桥台处', '支座处'],
           datasets: [{
-            data: [45, 30, 15, 10],
+            label: '混凝土应力(MPa)',
+            data: [2.8, 3.2, 2.5, 1.8, 3.5],
             backgroundColor: [
               'rgba(16, 185, 129, 0.7)',
-              'rgba(250, 204, 21, 0.7)',
-              'rgba(249, 115, 22, 0.7)',
+              'rgba(245, 158, 11, 0.7)',
+              'rgba(16, 185, 129, 0.7)',
+              'rgba(16, 185, 129, 0.7)',
               'rgba(239, 68, 68, 0.7)'
             ],
             borderColor: [
               'rgba(16, 185, 129, 1)',
-              'rgba(250, 204, 21, 1)',
-              'rgba(249, 115, 22, 1)',
+              'rgba(245, 158, 11, 1)',
+              'rgba(16, 185, 129, 1)',
+              'rgba(16, 185, 129, 1)',
               'rgba(239, 68, 68, 1)'
             ],
             borderWidth: 1
@@ -609,21 +685,30 @@
             tooltip: {
               backgroundColor: 'rgba(15, 23, 42, 0.9)',
               titleColor: '#06B6D4',
-              bodyColor: '#fff',
-              borderColor: '#06B6D4',
-              borderWidth: 1,
-              callbacks: {
-                label: function(context) {
-                  return context.label + ': ' + context.raw + '%';
-                }
-              }
+              bodyColor: '#fff'
             },
             legend: {
-              position: 'bottom',
               labels: {
-                color: '#E2E8F0',
-                padding: 15,
-                usePointStyle: true
+                color: '#94A3B8'
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              grid: {
+                color: 'rgba(148, 163, 184, 0.1)'
+              },
+              ticks: {
+                color: '#94A3B8'
+              }
+            },
+            x: {
+              grid: {
+                color: 'rgba(148, 163, 184, 0.1)'
+              },
+              ticks: {
+                color: '#94A3B8'
               }
             }
           }
@@ -633,1175 +718,112 @@
 
     // 初始化Three.js场景
     function initThreeJsScene() {
-      // 获取容器尺寸
+      // 获取容器
       const container = document.getElementById('model-container');
-      const width = container.clientWidth;
-      const height = container.clientHeight;
       
       // 创建场景
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0a0a0a);
-      
-  // （移除网格辅助以简化视图）
+      scene.background = new THREE.Color(0x0F172A);
       
       // 创建相机
-      const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-      camera.position.set(0, 15, 30);
-      camera.lookAt(0, 0, 0);
+      const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+      camera.position.set(0, 60, 120);
+      camera.lookAt(0, 15, 0);
       
       // 创建渲染器
       const renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(width, height);
-      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       container.appendChild(renderer.domElement);
       
-      // 添加轨道控制器
+      // 创建轨道控制器
       const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      // 降低鼠标交互灵敏度
+      controls.rotateSpeed = 0.3;  // 默认通常为1，进一步降低旋转速度
+      controls.zoomSpeed = 0.5;    // 默认通常为1
+      controls.panSpeed = 0.5;     // 默认通常为1
+      controls.target.set(0, 15, 0);
       
-      // 环境背景设置
-      scene.background = new THREE.Color(0x87CEEB); // 天空蓝色背景
-      
-      // 创建地面
-      const groundGeometry = new THREE.PlaneGeometry(100, 100);
-      const groundTexture = new THREE.CanvasTexture(createGroundTexture());
-      groundTexture.wrapS = THREE.RepeatWrapping;
-      groundTexture.wrapT = THREE.RepeatWrapping;
-      groundTexture.repeat.set(10, 10);
-      
+      // 创建地面（喀斯特地形效果）
+      const groundGeometry = new THREE.PlaneGeometry(400, 400);
+      const groundTexture = createGroundTexture();
       const groundMaterial = new THREE.MeshStandardMaterial({
         map: groundTexture,
-        metalness: 0.0,
-        roughness: 0.9
+        roughness: 0.8,
+        metalness: 0.1
       });
-      
       const ground = new THREE.Mesh(groundGeometry, groundMaterial);
       ground.rotation.x = -Math.PI / 2;
-      ground.position.y = -1;
+      ground.position.y = -10;
       ground.receiveShadow = true;
       scene.add(ground);
       
-      // （已移除水面效果，若需可在后续按需恢复）
-      
-      // 改进的光照设置
-      // 添加环境光
-      const ambientLight = new THREE.AmbientLight(0xd0d0ff, 0.6); // 偏蓝色调的环境光更自然
+      // 创建光照
+      // 环境光
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
       scene.add(ambientLight);
       
-      // 添加主方向光（模拟太阳）
-      const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
-      sunLight.position.set(30, 40, 25);
-      sunLight.castShadow = true;
+      // 主方向光（太阳）
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(50, 50, 50);
+      directionalLight.castShadow = true;
+      directionalLight.shadow.mapSize.width = 2048;
+      directionalLight.shadow.mapSize.height = 2048;
+      directionalLight.shadow.camera.left = -100;
+      directionalLight.shadow.camera.right = 100;
+      directionalLight.shadow.camera.top = 100;
+      directionalLight.shadow.camera.bottom = -100;
+      directionalLight.shadow.camera.near = 0.5;
+      directionalLight.shadow.camera.far = 200;
+      scene.add(directionalLight);
       
-      // 优化阴影质量
-      sunLight.shadow.mapSize.width = 4096;
-      sunLight.shadow.mapSize.height = 4096;
-      sunLight.shadow.camera.near = 0.5;
-      sunLight.shadow.camera.far = 150;
-      sunLight.shadow.camera.left = -80;
-      sunLight.shadow.camera.right = 80;
-      sunLight.shadow.camera.top = 80;
-      sunLight.shadow.camera.bottom = -80;
-      sunLight.shadow.bias = -0.0001;
-      scene.add(sunLight);
-      
-      // 添加天空散射光
-      const skyLight = new THREE.DirectionalLight(0x87CEEB, 0.5);
-      skyLight.position.set(-20, 15, -20);
+      // 天空散射光
+      const skyLight = new THREE.DirectionalLight(0x4080FF, 0.3);
+      skyLight.position.set(-50, 30, -50);
       scene.add(skyLight);
       
-      // 添加点光源增强局部细节
-      const pointLight1 = new THREE.PointLight(0xfff0e0, 0.5); // 暖色调点光源
-      pointLight1.position.set(-8, 8, 0);
-      pointLight1.distance = 20;
-      scene.add(pointLight1);
-      
-      const pointLight2 = new THREE.PointLight(0xfff0e0, 0.5);
-      pointLight2.position.set(8, 8, 0);
-      pointLight2.distance = 20;
-      scene.add(pointLight2);
-      
-      // 创建地面纹理
-      function createGroundTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        
-        // 基础颜色
-        ctx.fillStyle = '#2E8B57';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // 添加草地纹理
-        ctx.fillStyle = '#3CB371';
-        for (let i = 0; i < 100; i++) {
-          const x = Math.random() * canvas.width;
-          const y = Math.random() * canvas.height;
-          const w = 2 + Math.random() * 3;
-          const h = 2 + Math.random() * 3;
-          ctx.fillRect(x, y, w, h);
-        }
-        
-        // 添加一些石子
-        ctx.fillStyle = '#808080';
-        for (let i = 0; i < 50; i++) {
-          const x = Math.random() * canvas.width;
-          const y = Math.random() * canvas.height;
-          const r = 1 + Math.random() * 2;
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        
-        return canvas;
-      }
-      
-      // 创建纹理材质，增强真实感
-      const createRoadTexture = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        
-        // 基础沥青颜色
-        ctx.fillStyle = '#333333';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // 添加车道线
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(256, 0, 2, canvas.height); // 中间实线
-        
-        // 左右侧虚线
-        for (let i = 0; i < canvas.width; i += 20) {
-          ctx.fillRect(40, i, 10, 2);
-          ctx.fillRect(canvas.width - 50, i, 10, 2);
-        }
-        
-        // 添加一些路面细节
-        ctx.fillStyle = '#555555';
-        for (let i = 0; i < 100; i++) {
-          const x = Math.random() * canvas.width;
-          const y = Math.random() * canvas.height;
-          const w = 1 + Math.random() * 3;
-          const h = 1 + Math.random() * 2;
-          ctx.fillRect(x, y, w, h);
-        }
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(6, 1);
-        return texture;
-      };
-      
-      const createMetalTexture = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        
-        // 基础金属颜色
-        ctx.fillStyle = '#808080';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // 添加金属纹理效果
-        for (let i = 0; i < 5000; i++) {
-          const x = Math.random() * canvas.width;
-          const y = Math.random() * canvas.height;
-          const intensity = 0.5 + Math.random() * 0.5;
-          ctx.fillStyle = `rgba(255, 255, 255, ${intensity})`;
-          ctx.fillRect(x, y, 1, 1);
-        }
-        
-        // 添加一些划痕效果
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.lineWidth = 0.5;
-        for (let i = 0; i < 200; i++) {
-          const x1 = Math.random() * canvas.width;
-          const y1 = Math.random() * canvas.height;
-          const x2 = x1 + (Math.random() - 0.5) * 20;
-          const y2 = y1 + (Math.random() - 0.5) * 5;
-          ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
-          ctx.stroke();
-        }
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        return texture;
-      };
-      
-      // 创建材质
-      const roadTexture = createRoadTexture();
-      const metalTexture = createMetalTexture();
-      
-      // 创建更真实的桥梁材质
-      const bridgeMaterial = new THREE.MeshStandardMaterial({
-        color: 0x2a354a,
-        metalness: 0.5,
-        roughness: 0.4,
-        map: metalTexture,
-        side: THREE.DoubleSide
-      });
-      
-      // 桥梁结构材质（用于钢梁等）
-      const structureMaterial = new THREE.MeshStandardMaterial({
-        color: 0x1a1a1a,
-        metalness: 0.8,
-        roughness: 0.2,
-        map: metalTexture
-      });
-      
-      // 路面材质
-      const roadMaterial = new THREE.MeshStandardMaterial({
-        color: 0x333333,
-        metalness: 0.1,
-        roughness: 0.9,
-        map: roadTexture
-      });
-      
-      // 创建改进的桥梁模型
+      // 创建桥梁组
       const bridgeGroup = new THREE.Group();
-      
-      // 创建桥梁底部结构（钢梁）- 改进为I型梁结构
-      const createBeam = (length, positionY) => {
-        const beamGroup = new THREE.Group();
-        
-        // 上翼板
-        const topFlange = new THREE.Mesh(
-          new THREE.BoxGeometry(length, 0.2, 4),
-          structureMaterial
-        );
-        topFlange.position.y = 0.3;
-        beamGroup.add(topFlange);
-        
-        // 腹板
-        const web = new THREE.Mesh(
-          new THREE.BoxGeometry(length, 0.6, 0.8),
-          structureMaterial
-        );
-        beamGroup.add(web);
-        
-        // 下翼板
-        const bottomFlange = new THREE.Mesh(
-          new THREE.BoxGeometry(length, 0.2, 4),
-          structureMaterial
-        );
-        bottomFlange.position.y = -0.3;
-        beamGroup.add(bottomFlange);
-        
-        beamGroup.position.y = positionY;
-        return beamGroup;
-      };
-      
-      // 添加主梁
-      const mainBeam = createBeam(29, 5);
-      bridgeGroup.add(mainBeam);
-      
-      // 创建桥面板（路面）
-      const roadGeometry = new THREE.BoxGeometry(28, 0.3, 4.5);
-      const roadSurface = new THREE.Mesh(roadGeometry, roadMaterial);
-      roadSurface.position.y = 5.5;
-      bridgeGroup.add(roadSurface);
-      
-      // 添加护栏 - 更真实的护栏设计
-      const guardrailMaterial = new THREE.MeshStandardMaterial({
-        color: 0x4a5568,
-        metalness: 0.5,
-        roughness: 0.4,
-        map: metalTexture
-      });
-      
-      // 创建单侧护栏
-      const createGuardrail = (zPosition) => {
-        const railGroup = new THREE.Group();
-        
-        // 护栏立柱
-        for (let i = -13; i <= 13; i += 2) {
-          const postGeometry = new THREE.CylinderGeometry(0.1, 0.1, 1.2, 8);
-          const post = new THREE.Mesh(postGeometry, guardrailMaterial);
-          post.position.set(i, 5.6, zPosition);
-          railGroup.add(post);
-          
-          // 横向连接柱
-          const crossGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.3);
-          const cross = new THREE.Mesh(crossGeometry, guardrailMaterial);
-          cross.position.set(i, 6.2, zPosition + (zPosition > 0 ? -0.15 : 0.15));
-          railGroup.add(cross);
-        }
-        
-        // 顶部护栏杆
-        const topRailGeometry = new THREE.CylinderGeometry(0.05, 0.05, 28, 8);
-        const topRail = new THREE.Mesh(topRailGeometry, guardrailMaterial);
-        topRail.rotation.z = Math.PI / 2;
-        topRail.position.set(0, 6.2, zPosition + (zPosition > 0 ? -0.15 : 0.15));
-        railGroup.add(topRail);
-        
-        // 中部护栏杆
-        const midRailGeometry = new THREE.CylinderGeometry(0.04, 0.04, 28, 8);
-        const midRail = new THREE.Mesh(midRailGeometry, guardrailMaterial);
-        midRail.rotation.z = Math.PI / 2;
-        midRail.position.set(0, 5.9, zPosition + (zPosition > 0 ? -0.15 : 0.15));
-        railGroup.add(midRail);
-        
-        return railGroup;
-      };
-      
-      // 添加左右护栏
-      bridgeGroup.add(createGuardrail(2.25));
-      bridgeGroup.add(createGuardrail(-2.25));
-      
-      // 添加路缘石
-      const curbMaterial = new THREE.MeshStandardMaterial({
-        color: 0x666666,
-        metalness: 0.1,
-        roughness: 0.7
-      });
-      
-      const curbGeometry = new THREE.BoxGeometry(28, 0.1, 0.2);
-      const leftCurb = new THREE.Mesh(curbGeometry, curbMaterial);
-      leftCurb.position.set(0, 5.65, 2.15);
-      bridgeGroup.add(leftCurb);
-      
-      const rightCurb = new THREE.Mesh(curbGeometry, curbMaterial);
-      rightCurb.position.set(0, 5.65, -2.15);
-      bridgeGroup.add(rightCurb);
-      
-      // 护栏立柱已在createGuardrail函数中创建，此处不再重复添加
-      
-      // 创建改进的桥墩（更像真实桥梁，不会穿过桥面）
-      const createPillar = (xPos, isMain = false) => {
-        const pillarGroup = new THREE.Group();
-        
-        // 桥墩基础（扩大的底座增加稳定性）
-        const baseGeometry = new THREE.CylinderGeometry(2.5, 2.5, 1, 16);
-        const base = new THREE.Mesh(baseGeometry, structureMaterial);
-        base.position.y = 0.5;
-        pillarGroup.add(base);
-        
-        // 桥墩主体（调整高度，使其不穿过桥面）
-        const pillarHeight = 4.5; // 降低高度，使其顶部刚好支撑桥面下方
-        const pillarGeometry = new THREE.CylinderGeometry(isMain ? 1.8 : 1.5, isMain ? 2.2 : 1.8, pillarHeight, 16);
-        const pillar = new THREE.Mesh(pillarGeometry, bridgeMaterial);
-        pillar.position.y = 0.5 + pillarHeight / 2; // 位置调整，从底座顶部开始
-        pillarGroup.add(pillar);
-        
-        // 桥墩顶部（帽梁）
-        const capGeometry = new THREE.BoxGeometry(5, 1, 5);
-        const cap = new THREE.Mesh(capGeometry, structureMaterial);
-        cap.position.y = 0.5 + pillarHeight + 0.5; // 帽梁位于桥墩顶部，刚好在桥面下方
-        pillarGroup.add(cap);
-        
-        // 添加横向支撑和斜撑
-        const supportMaterial = new THREE.MeshStandardMaterial({
-          color: 0x1a1a1a,
-          metalness: 0.8,
-          roughness: 0.3,
-          map: metalTexture
-        });
-        
-        // 斜撑
-        const createDiagonalSupport = (x, y, z, rotationX, rotationY, rotationZ) => {
-          const supportGeometry = new THREE.BoxGeometry(0.4, 3, 0.4); // 缩短斜撑长度
-          const support = new THREE.Mesh(supportGeometry, supportMaterial);
-          support.position.set(x, y, z);
-          support.rotation.x = rotationX;
-          support.rotation.y = rotationY;
-          support.rotation.z = rotationZ;
-          return support;
-        };
-        
-        // 添加四个方向的斜撑（调整位置，使其连接到帽梁）
-        pillarGroup.add(createDiagonalSupport(-1.5, 3.5, 1.5, Math.PI/4, 0, Math.PI/4));
-        pillarGroup.add(createDiagonalSupport(1.5, 3.5, 1.5, Math.PI/4, 0, -Math.PI/4));
-        pillarGroup.add(createDiagonalSupport(-1.5, 3.5, -1.5, Math.PI/4, 0, -Math.PI/4));
-        pillarGroup.add(createDiagonalSupport(1.5, 3.5, -1.5, Math.PI/4, 0, Math.PI/4));
-        
-        // 如果是主桥墩，添加更多支撑结构
-        if (isMain) {
-          // 横向支撑梁（调整位置，不穿过桥面）
-          const crossBeamGeometry = new THREE.BoxGeometry(0.5, 0.5, 6);
-          const crossBeam = new THREE.Mesh(crossBeamGeometry, supportMaterial);
-          crossBeam.position.set(0, 4.5, 0); // 放置在帽梁上方，刚好支撑桥面
-          pillarGroup.add(crossBeam);
-        }
-        
-        // 添加一些细节（如混凝土纹理效果）
-        const detailGeometry = new THREE.BoxGeometry(isMain ? 2.4 : 2.0, 0.1, isMain ? 2.4 : 2.0);
-        const detailMaterial = new THREE.MeshStandardMaterial({
-          color: 0x1e293b,
-          metalness: 0.1,
-          roughness: 0.8
-        });
-        
-        const detail1 = new THREE.Mesh(detailGeometry, detailMaterial);
-        detail1.position.set(0, 2, 0); // 调整细节位置
-        pillarGroup.add(detail1);
-        
-        const detail2 = new THREE.Mesh(detailGeometry, detailMaterial);
-        detail2.position.set(0, 4, 0); // 调整细节位置，不超出桥墩高度
-        pillarGroup.add(detail2);
-        
-        pillarGroup.position.x = xPos;
-        return pillarGroup;
-      };
-      
-      // 添加左侧桥墩
-      const leftPillar = createPillar(-14);
-      bridgeGroup.add(leftPillar);
-      
-      // 添加右侧桥墩
-      const rightPillar = createPillar(14);
-      bridgeGroup.add(rightPillar);
-      
-      // 添加中间支撑柱（主桥墩）
-      const midPillar = createPillar(0, true);
-      bridgeGroup.add(midPillar);
-      
-      // 添加辅助支撑
-      const addAuxiliarySupport = (xPos, zPos) => {
-        const supportGeometry = new THREE.BoxGeometry(0.3, 3, 0.3);
-        const support = new THREE.Mesh(supportGeometry, structureMaterial);
-        support.position.set(xPos, 3.5, zPos);
-        bridgeGroup.add(support);
-      };
-      
-      // 在桥梁和桥墩之间添加斜撑连接
-      const addConnectionBrace = (fromX, fromY, fromZ, toX, toY, toZ) => {
-        const dx = toX - fromX;
-        const dy = toY - fromY;
-        const dz = toZ - fromZ;
-        const length = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        
-        const braceGeometry = new THREE.BoxGeometry(0.2, 0.2, length);
-        const brace = new THREE.Mesh(braceGeometry, structureMaterial);
-        
-        // 设置位置在两点之间
-        brace.position.set(
-          (fromX + toX) / 2,
-          (fromY + toY) / 2,
-          (fromZ + toZ) / 2
-        );
-        
-        // 计算旋转以对准两点
-        const direction = new THREE.Vector3(dx, dy, dz).normalize();
-        const up = new THREE.Vector3(0, 1, 0);
-        const axis = new THREE.Vector3().crossVectors(up, direction).normalize();
-        const angle = Math.acos(direction.dot(up));
-        
-        brace.quaternion.setFromAxisAngle(axis, angle);
-        
-        bridgeGroup.add(brace);
-      };
-      
-      // 添加桥梁与桥墩之间的连接支撑
-      addConnectionBrace(-14, 9.5, 0, -10, 5, 0);
-      addConnectionBrace(-14, 9.5, 0, -10, 5, 2);
-      addConnectionBrace(-14, 9.5, 0, -10, 5, -2);
-      
-      addConnectionBrace(14, 9.5, 0, 10, 5, 0);
-      addConnectionBrace(14, 9.5, 0, 10, 5, 2);
-      addConnectionBrace(14, 9.5, 0, 10, 5, -2);
-      
-      addConnectionBrace(0, 9.5, 0, -5, 5, 0);
-      addConnectionBrace(0, 9.5, 0, 5, 5, 0);
-      addConnectionBrace(0, 9.5, 0, 0, 5, 2);
-      addConnectionBrace(0, 9.5, 0, 0, 5, -2);
-      
-      // 添加塔架（用于悬索桥）
-      const createTower = (xPos, towerHeight = 20) => {
-        const towerGroup = new THREE.Group();
-        const towerWidth = 1.5;
-
-        const towerMaterial = new THREE.MeshStandardMaterial({
-          color: 0x2a354a,
-          metalness: 0.6,
-          roughness: 0.35,
-          map: metalTexture
-        });
-
-        // 两根立柱及横梁（简化的门式塔）
-        const legGeo = new THREE.BoxGeometry(towerWidth, towerHeight, towerWidth);
-        const leftLeg = new THREE.Mesh(legGeo, towerMaterial);
-        const rightLeg = new THREE.Mesh(legGeo, towerMaterial);
-        leftLeg.position.set(-1.2, towerHeight/2 + 5.5, 0);
-        rightLeg.position.set(1.2, towerHeight/2 + 5.5, 0);
-        towerGroup.add(leftLeg, rightLeg);
-
-        const topBeamGeo = new THREE.BoxGeometry(3.0, 0.6, 1.2);
-        const topBeam = new THREE.Mesh(topBeamGeo, towerMaterial);
-        topBeam.position.set(0, towerHeight + 5.5 + 0.3, 0);
-        towerGroup.add(topBeam);
-
-        towerGroup.position.x = xPos;
-        return towerGroup;
-      };
-
-      // 悬索桥参数
-      const anchorX = 18;     // 锚碇位置（两端）
-      const towerX = 8;       // 塔位置（左右对称）
-      const deckY = 5.5;      // 桥面高度（与现有roadSurface一致）
-      const towerHeight = 20; // 塔高（相对于桥面）
-
-      // 添加左右塔
-      const leftTower = createTower(-towerX, towerHeight);
-      const rightTower = createTower(towerX, towerHeight);
-      bridgeGroup.add(leftTower);
-      bridgeGroup.add(rightTower);
-
-      // 主缆材料与函数：使用曲线 + TubeGeometry 模拟悬链线形状
-      const mainCableMaterial = new THREE.MeshStandardMaterial({
-        color: 0xd0d0d0,
-        metalness: 0.9,
-        roughness: 0.15
-      });
-
-      function createMainCable(points, radius = 0.08, segments = 200) {
-        const curve = new THREE.CatmullRomCurve3(points);
-        const geometry = new THREE.TubeGeometry(curve, segments, radius, 8, false);
-        const mesh = new THREE.Mesh(geometry, mainCableMaterial);
-        mesh.userData.curve = curve; // 暴露曲线以便后续挂线使用
-        return mesh;
-      }
-
-      // 使用抛物线近似主缆（比手动控制点更规则）
-      const leftAnchor = new THREE.Vector3(-anchorX, deckY + 1, 0);
-      const rightAnchor = new THREE.Vector3(anchorX, deckY + 1, 0);
-      const leftTowerTop = new THREE.Vector3(-towerX, deckY + towerHeight + 0.3, 0);
-      const rightTowerTop = new THREE.Vector3(towerX, deckY + towerHeight + 0.3, 0);
-
-      // 我们在两段（左锚->左塔顶->中跨->右塔顶->右锚）上用二次曲线采样
-      function sampleParabola(x0, y0, x1, y1, samples) {
-        // 构造过两点和中点下垂的二次函数 y = ax^2 + bx + c
-        // 取中点为 xMid=(x0+x1)/2, yMid = min(y0,y1) - sagMid
-        const xMid = (x0 + x1) / 2;
-        const sagMid = 6; // 中跨下垂量，可调
-        const yMid = Math.min(y0, y1) - sagMid;
-
-        // 解三元一次以找到 a,b,c
-        // [x0^2 x0 1][a] = [y0]
-        // [xMid^2 xMid 1][b]   [yMid]
-        // [x1^2 x1 1][c]      [y1]
-        const A = [[x0*x0, x0, 1],[xMid*xMid, xMid, 1],[x1*x1, x1, 1]];
-        const Y = [y0, yMid, y1];
-        // 求解线性方程 A * coeff = Y，使用克拉默法则（小矩阵）
-        const det = (m) => (
-          m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1]) -
-          m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0]) +
-          m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0])
-        );
-        const D = det(A);
-        let a=0,b=0,c=0;
-        if (Math.abs(D) > 1e-6) {
-          const replaceCol = (mat, col, vec) => mat.map((row,i)=> row.map((v,j)=> j===col? vec[i]: v));
-          const Da = det(replaceCol(A,0,Y));
-          const Db = det(replaceCol(A,1,Y));
-          const Dc = det(replaceCol(A,2,Y));
-          a = Da / D; b = Db / D; c = Dc / D;
-        }
-
-        const pts = [];
-        for (let i=0;i<=samples;i++) {
-          const t = i / samples;
-          const x = x0 + (x1 - x0) * t;
-          const y = a*x*x + b*x + c;
-          pts.push(new THREE.Vector3(x, y, 0));
-        }
-        return pts;
-      }
-
-      // 合并左段（左锚->左塔->中跨）和右段（中跨->右塔->右锚）
-      const leftSeg = sampleParabola(leftAnchor.x, leftAnchor.y, leftTowerTop.x, leftTowerTop.y, 60);
-      const middleSeg = sampleParabola(leftTowerTop.x, leftTowerTop.y, rightTowerTop.x, rightTowerTop.y, 80);
-      const rightSeg = sampleParabola(rightTowerTop.x, rightTowerTop.y, rightAnchor.x, rightAnchor.y, 60);
-
-      // 合并并去重边界点
-      let mainPoints = leftSeg.concat(middleSeg.slice(1)).concat(rightSeg.slice(1));
-      const mainCable = createMainCable(mainPoints, 0.09, mainPoints.length * 2);
-      bridgeGroup.add(mainCable);
-
-      // 添加锚碇体块以示意主缆固定处
-      const anchorMaterial = new THREE.MeshStandardMaterial({ color: 0x4a5568, metalness: 0.3, roughness: 0.6 });
-      const anchorGeo = new THREE.BoxGeometry(1.6, 1.2, 2.5);
-      const leftAnchorBlock = new THREE.Mesh(anchorGeo, anchorMaterial);
-      leftAnchorBlock.position.set(-anchorX, deckY + 0.6, 0);
-      bridgeGroup.add(leftAnchorBlock);
-
-      const rightAnchorBlock = new THREE.Mesh(anchorGeo, anchorMaterial);
-      rightAnchorBlock.position.set(anchorX, deckY + 0.6, 0);
-      bridgeGroup.add(rightAnchorBlock);
-
-      // 吊杆（hanger）: 沿桥面等距分布，从主缆下垂到桥面
-      function createHanger(xPos, zPos = 0, hangerRadius = 0.03) {
-        // 在 mainCable 曲线上找到最近的点（按 x 坐标最接近），以获得精确高度
-        const curve = mainCable.userData.curve;
-        const divisions = 300;
-        let closestPoint = curve.getPoint(0);
-        let minDx = Math.abs(closestPoint.x - xPos);
-        for (let i=1;i<=divisions;i++){
-          const p = curve.getPoint(i/divisions);
-          const dx = Math.abs(p.x - xPos);
-          if (dx < minDx) { minDx = dx; closestPoint = p; }
-        }
-        const hangLength = Math.max(0.1, closestPoint.y - deckY);
-        const hangerGeo = new THREE.CylinderGeometry(hangerRadius, hangerRadius, hangLength, 6);
-        const hanger = new THREE.Mesh(hangerGeo, mainCableMaterial);
-        hanger.position.set(xPos, deckY + hangLength / 2, zPos);
-        return hanger;
-      }
-
-      // 在桥面长度范围内等距生成吊杆（同样在左右宽度两侧）
-      const hangerCount = 28;
-      for (let i = 0; i <= hangerCount; i++) {
-        const x = -14 + (28 * i / hangerCount); // 与路面长度28对齐
-        const hanger = createHanger(x, 0, 0.03);
-        bridgeGroup.add(hanger);
-      }
-
-      // 使桥面在锚碇之间悬挂（路面已存在，确保位置对齐）
-      // 若需要，可将路面父级移动以与锚碇对齐；当前roadSurface的尺寸为28，已居中于桥Group
-
       scene.add(bridgeGroup);
       
-  // （已移除）病害点与传感器集合：这些为可选可视化，默认不创建以精简模型
-  const defectGroup = null;
-  const sensorGroup = null;
+      // 创建山组
+      const mountainsGroup = new THREE.Group();
+      scene.add(mountainsGroup);
       
-      // 创建热力图层（用于应力分布和健康评分映射）
-      let heatmapLayer;
+      // 在桥梁两端创建山
+      createMountains(mountainsGroup, -130, 130); // 基于桥梁总长260米
       
-      // 改进的应力分布材质
-      const stressMaterial = new THREE.MeshStandardMaterial({
-        map: createHeatmapTexture(),
-        transparent: true,
-        opacity: 0.8,
-        metalness: 0.2,
-        roughness: 0.6,
-        side: THREE.DoubleSide
+      // 创建混凝土材质（素模灰白色）
+      const concreteMaterial = new THREE.MeshStandardMaterial({
+        color: 0xE0E0E0,
+        roughness: 0.7,
+        metalness: 0.1
       });
       
-      // 创建热力图纹理
-      function createHeatmapTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        
-        // 创建渐变
-        const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-        gradient.addColorStop(0, '#10B981'); // 低应力
-        gradient.addColorStop(0.5, '#FACC15'); // 中等应力
-        gradient.addColorStop(1, '#EF4444'); // 高应力
-        
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        return texture;
-      }
+      // 创建钢筋材质
+      const steelMaterial = new THREE.MeshStandardMaterial({
+        color: 0xCCCCCC,
+        roughness: 0.5,
+        metalness: 0.8
+      });
+      
+      // 创建预应力混凝土连续箱梁
+      createSuspensionBridge(bridgeGroup, concreteMaterial, steelMaterial);
+      
+      // 创建病害点组
+      const defectGroup = new THREE.Group();
+      scene.add(defectGroup);
       
       // 创建病害点
-      function createDefect(position, type, size = 0.5) {
-        let color, material, defect;
-        switch (type) {
-          case 'crack':
-            color = 0xEF4444; // 红色
-            // 创建更真实的裂缝
-            const crackGroup = new THREE.Group();
-            
-            // 主裂缝
-            const mainCrackGeometry = new THREE.PlaneGeometry(size * 2, size * 0.3);
-            const crackTexture = createCrackTexture();
-            
-            material = new THREE.MeshStandardMaterial({
-              color: color,
-              map: crackTexture,
-              transparent: true,
-              roughness: 0.9,
-              metalness: 0.1
-            });
-            
-            const mainCrack = new THREE.Mesh(mainCrackGeometry, material);
-            mainCrack.rotation.x = Math.PI / 2;
-            crackGroup.add(mainCrack);
-            
-            // 添加分支裂缝
-            for (let i = 0; i < 3; i++) {
-              const branchGeometry = new THREE.PlaneGeometry(size * 0.8, size * 0.2);
-              const branch = new THREE.Mesh(branchGeometry, material);
-              branch.rotation.x = Math.PI / 2;
-              branch.rotation.z = (Math.random() - 0.5) * Math.PI / 2;
-              branch.position.x = (Math.random() - 0.5) * size;
-              branch.position.z = (Math.random() - 0.5) * size * 0.3;
-              crackGroup.add(branch);
-            }
-            
-            defect = crackGroup;
-            break;
-            
-          case 'cave':
-            color = 0xFACC15; // 黄色
-            // 创建更真实的洞穴（带深度感）
-            const caveGroup = new THREE.Group();
-            
-            // 洞穴外圈
-            const outerCaveGeometry = new THREE.SphereGeometry(size, 16, 16);
-            const outerMaterial = new THREE.MeshStandardMaterial({
-              color: color,
-              roughness: 0.9,
-              metalness: 0.1,
-              transparent: true,
-              opacity: 0.8
-            });
-            
-            const outerCave = new THREE.Mesh(outerCaveGeometry, outerMaterial);
-            caveGroup.add(outerCave);
-            
-            // 洞穴内部（模拟深度）
-            const innerCaveGeometry = new THREE.SphereGeometry(size * 0.7, 12, 12);
-            const innerMaterial = new THREE.MeshStandardMaterial({
-              color: 0xD97706, // 更深的黄色
-              roughness: 1.0,
-              metalness: 0.0,
-              transparent: true,
-              opacity: 0.6
-            });
-            
-            const innerCave = new THREE.Mesh(innerCaveGeometry, innerMaterial);
-            innerCave.position.y = -size * 0.3;
-            caveGroup.add(innerCave);
-            
-            defect = caveGroup;
-            break;
-            
-          case 'rust':
-            color = 0xDC2626; // 铁锈色（更真实的红色）
-            // 创建更真实的锈蚀效果
-            const rustGroup = new THREE.Group();
-            
-            // 锈蚀基底
-            const rustBaseGeometry = new THREE.PlaneGeometry(size * 2, size * 2);
-            const rustTexture = createRustTexture();
-            
-            material = new THREE.MeshStandardMaterial({
-              map: rustTexture,
-              roughness: 0.8,
-              metalness: 0.4,
-              transparent: true
-            });
-            
-            const rustBase = new THREE.Mesh(rustBaseGeometry, material);
-            rustBase.rotation.x = Math.PI / 2;
-            rustBase.rotation.z = Math.random() * Math.PI;
-            rustGroup.add(rustBase);
-            
-            // 添加一些凸起的锈蚀点
-            for (let i = 0; i < 5; i++) {
-              const rustPointGeometry = new THREE.SphereGeometry(size * 0.2, 8, 8);
-              const rustPoint = new THREE.Mesh(rustPointGeometry, material);
-              rustPoint.position.x = (Math.random() - 0.5) * size;
-              rustPoint.position.z = (Math.random() - 0.5) * size;
-              rustPoint.position.y = size * 0.05;
-              rustGroup.add(rustPoint);
-            }
-            
-            defect = rustGroup;
-            break;
-            
-          default:
-            color = 0x6B7280; // 灰色
-            material = new THREE.MeshStandardMaterial({
-              color: color,
-              metalness: 0.2,
-              roughness: 0.5
-            });
-            const defaultGeometry = new THREE.SphereGeometry(size, 16, 16);
-            defect = new THREE.Mesh(defaultGeometry, material);
-        }
-        
-        // 添加发光效果（更真实的光晕效果）
-        const glowGeometry = new THREE.SphereGeometry(size * 1.5, 16, 16);
-        const glowMaterial = new THREE.MeshStandardMaterial({
-          color: color,
-          transparent: true,
-          opacity: 0.4,
-          emissive: color,
-          emissiveIntensity: 0.2,
-          side: THREE.DoubleSide,
-          blending: THREE.AdditiveBlending
-        });
-        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-        
-        const defectSystem = new THREE.Group();
-        defectSystem.add(defect);
-        defectSystem.add(glow);
-        defectSystem.position.copy(position);
-        
-        // 添加脉冲动画
-        defectSystem.userData.pulseScale = 1;
-        defectSystem.userData.pulseDirection = 1;
-        
-        return defectSystem;
-      }
+      createDefects(defectGroup);
       
-      // 创建裂缝纹理
-      function createCrackTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 64;
-        const ctx = canvas.getContext('2d');
-        
-        // 透明背景
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // 绘制不规则裂缝
-        ctx.strokeStyle = '#EF4444';
-        ctx.lineWidth = 2;
-        
-        ctx.beginPath();
-        ctx.moveTo(10, canvas.height / 2);
-        
-        let x = 10;
-        let y = canvas.height / 2;
-        
-        while (x < canvas.width - 10) {
-          const newX = x + 5 + Math.random() * 10;
-          const newY = y + (Math.random() - 0.5) * 10;
-          
-          // 确保y在合理范围内
-          y = Math.max(5, Math.min(canvas.height - 5, newY));
-          
-          ctx.quadraticCurveTo(x + 5, y - 3, newX, y);
-          x = newX;
-        }
-        
-        ctx.stroke();
-        
-        // 添加一些细节纹理
-        for (let i = 0; i < 20; i++) {
-          const startX = 20 + Math.random() * (canvas.width - 40);
-          const startY = canvas.height / 2 + (Math.random() - 0.5) * 20;
-          const length = 5 + Math.random() * 10;
-          const angle = Math.PI / 2 + (Math.random() - 0.5) * Math.PI / 2;
-          
-          ctx.beginPath();
-          ctx.moveTo(startX, startY);
-          ctx.lineTo(
-            startX + Math.cos(angle) * length,
-            startY + Math.sin(angle) * length
-          );
-          ctx.strokeStyle = `rgba(239, 68, 68, ${0.3 + Math.random() * 0.5})`;
-          ctx.lineWidth = 1 + Math.random();
-          ctx.stroke();
-        }
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        return texture;
-      }
-      
-      // 创建铁锈纹理
-      function createRustTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        
-        // 基础铁锈色
-        ctx.fillStyle = '#DC2626';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // 添加锈斑效果
-        for (let i = 0; i < 300; i++) {
-          const x = Math.random() * canvas.width;
-          const y = Math.random() * canvas.height;
-          const radius = 2 + Math.random() * 5;
-          const opacity = 0.3 + Math.random() * 0.5;
-          
-          ctx.beginPath();
-          ctx.arc(x, y, radius, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(217, 119, 6, ${opacity})`; // 橙褐色
-          ctx.fill();
-        }
-        
-        // 添加一些裂纹和纹理
-        ctx.strokeStyle = `rgba(153, 27, 27, 0.7)`;
-        ctx.lineWidth = 1;
-        
-        for (let i = 0; i < 50; i++) {
-          const startX = Math.random() * canvas.width;
-          const startY = Math.random() * canvas.height;
-          const length = 10 + Math.random() * 30;
-          const angle = Math.random() * Math.PI * 2;
-          
-          ctx.beginPath();
-          ctx.moveTo(startX, startY);
-          ctx.lineTo(
-            startX + Math.cos(angle) * length,
-            startY + Math.sin(angle) * length
-          );
-          ctx.stroke();
-        }
-        
-        // 添加一些亮斑模拟金属反光
-        for (let i = 0; i < 100; i++) {
-          const x = Math.random() * canvas.width;
-          const y = Math.random() * canvas.height;
-          const radius = 1 + Math.random() * 2;
-          
-          ctx.beginPath();
-          ctx.arc(x, y, radius, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255, 255, 255, ${0.2 + Math.random() * 0.3})`;
-          ctx.fill();
-        }
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        return texture;
-      }
-      
-      // 创建传感器点
-      function createSensor(position, value) {
-        // 创建更真实的传感器模型
-        const sensorGroup = new THREE.Group();
-        
-        // 传感器底座
-        const baseMaterial = new THREE.MeshStandardMaterial({
-          color: 0x334155,
-          metalness: 0.7,
-          roughness: 0.3
-        });
-        const baseGeometry = new THREE.CylinderGeometry(0.35, 0.3, 0.15, 8);
-        const base = new THREE.Mesh(baseGeometry, baseMaterial);
-        base.position.y = -0.075;
-        sensorGroup.add(base);
-        
-        // 传感器主体
-        const sensorMaterial = new THREE.MeshStandardMaterial({
-          color: 0x06B6D4,
-          metalness: 0.8,
-          roughness: 0.2,
-          emissive: 0x06B6D4,
-          emissiveIntensity: 0.3
-        });
-        const sensorGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.3, 8);
-        const sensor = new THREE.Mesh(sensorGeometry, sensorMaterial);
-        sensorGroup.add(sensor);
-        
-        // 传感器顶部
-        const topGeometry = new THREE.CylinderGeometry(0.2, 0.25, 0.05, 8);
-        const top = new THREE.Mesh(topGeometry, sensorMaterial);
-        top.position.y = 0.175;
-        sensorGroup.add(top);
-        
-        // 添加数据标签（更真实的显示）
-        const dataColor = value > 70 ? 0xEF4444 : value > 40 ? 0xFACC15 : 0x10B981;
-        const dataMaterial = new THREE.MeshStandardMaterial({
-          color: dataColor,
-          metalness: 0.6,
-          roughness: 0.3,
-          emissive: dataColor,
-          emissiveIntensity: 0.5
-        });
-        const dataGeometry = new THREE.BoxGeometry(0.1, 0.4, 0.1);
-        const dataIndicator = new THREE.Mesh(dataGeometry, dataMaterial);
-        dataIndicator.position.y = 0.5;
-        sensorGroup.add(dataIndicator);
-        
-        // 添加连接线
-        const wireMaterial = new THREE.MeshStandardMaterial({
-          color: 0x475569,
-          metalness: 0.5,
-          roughness: 0.4
-        });
-        const wireGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.4, 4);
-        const wire = new THREE.Mesh(wireGeometry, wireMaterial);
-        wire.position.y = -0.2;
-        wire.rotation.x = Math.PI / 2;
-        sensorGroup.add(wire);
-        
-        sensorGroup.position.copy(position);
-        return sensorGroup;
-      }
-      
-      // 不再默认添加病害点和传感器模型以简化视图
-      const defects = [];
-      const sensors = [];
-      
-      // 切换显示模式
-      function setDisplayMode(mode) {
-        // 重置所有材质
-        bridgeMaterial.color.set(0x1e293b);
-        bridgeMaterial.map = null;
-        bridgeMaterial.needsUpdate = true;
-        
-        // 移除现有的热力图层
-        if (heatmapLayer) {
-          scene.remove(heatmapLayer);
-          heatmapLayer = null;
-        }
-        
-        switch (mode) {
-          case 'stress':
-            // 应用应力分布材质到桥梁主体
-            const stressClone = new THREE.BoxGeometry(28, 0.3, 4.5); // 使用与桥面板相同的几何体
-            heatmapLayer = new THREE.Mesh(stressClone, stressMaterial);
-            heatmapLayer.position.set(0, 5.5, 0); // 与桥面板相同的位置
-            heatmapLayer.scale.set(1.01, 1.02, 1.01); // 稍微大一点以覆盖原模型
-            scene.add(heatmapLayer);
-            break;
-            
-          case 'health':
-            // 应用健康评分映射
-            const healthMaterial = new THREE.MeshStandardMaterial({
-              map: createHealthMapTexture(),
-              transparent: true,
-              opacity: 0.8,
-              metalness: 0.2,
-              roughness: 0.6,
-              side: THREE.DoubleSide
-            });
-            const healthClone = new THREE.BoxGeometry(28, 0.3, 4.5); // 使用与桥面板相同的几何体
-            heatmapLayer = new THREE.Mesh(healthClone, healthMaterial);
-            heatmapLayer.position.set(0, 5.5, 0); // 与桥面板相同的位置
-            heatmapLayer.scale.set(1.01, 1.02, 1.01);
-            scene.add(heatmapLayer);
-            break;
-            
-          case 'sensor':
-            // 传感器模式 - 高亮显示传感器（仅在存在时）
-            if (sensorGroup) sensorGroup.visible = true;
-            break;
-            
-          case 'normal':
-          default:
-            // 标准模式
-            bridgeMaterial.color.set(0x1e293b);
-            break;
-        }
-      }
-      
-      // 创建健康评分映射纹理
-      function createHealthMapTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        
-        // 创建渐变
-        const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-        gradient.addColorStop(0, '#10B981'); // 90-100分
-        gradient.addColorStop(0.25, '#34D399'); // 70-89分
-        gradient.addColorStop(0.5, '#FACC15'); // 50-69分
-        gradient.addColorStop(0.75, '#F97316'); // 30-49分
-        gradient.addColorStop(1, '#EF4444'); // 0-29分
-        
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        return texture;
-      }
-      
-      // 设置可视化透明度
-      function setVisualizationOpacity(opacity) {
-        if (stressMaterial) {
-          stressMaterial.opacity = opacity / 100;
-        }
-        if (heatmapLayer && heatmapLayer.material) {
-          heatmapLayer.material.opacity = opacity / 100;
-        }
-      }
-      
-      // 切换病害点显示
-      function toggleDefects(show) {
-        defectGroup.visible = show;
-      }
-      
-      // 切换传感器显示
-      function toggleSensors(show) {
-        sensorGroup.visible = show;
-      }
-      
-      // 时间轴播放控制
-      let isPlaying = false;
-      let currentTime = 0;
-      const timeMax = 100;
-      const timeStep = 0.5;
-      
-      function updateTimeline() {
-        if (isPlaying) {
-          currentTime += timeStep;
-          if (currentTime > timeMax) {
-            currentTime = timeMax;
-            isPlaying = false;
-          }
-          updateTimeDisplay();
-          updateModelByTime(currentTime);
-        }
-      }
-      
-      function updateTimeDisplay() {
-        const slider = document.getElementById('time-slider');
-        const label = document.getElementById('time-label');
-        slider.value = currentTime;
-        
-        // 计算日期（从2024-01-01到2024-12-31）
-        const startDate = new Date('2024-01-01');
-        const endDate = new Date('2025-10-18');
-        const totalDays = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24));
-        const currentDay = Math.floor(totalDays * (currentTime / timeMax));
-        const currentDate = new Date(startDate);
-        currentDate.setDate(startDate.getDate() + currentDay);
-        
-        const formattedDate = currentDate.toISOString().split('T')[0];
-        label.textContent = formattedDate;
-        
-        // 动态调整时间标签位置，避免重叠
-        const sliderRect = slider.getBoundingClientRect();
-        const progress = currentTime / timeMax;
-        const labelWidth = label.offsetWidth;
-        // 计算位置，确保标签不会超出滑块边界
-        const newLeft = Math.max(0, Math.min(sliderRect.width - labelWidth, sliderRect.width * progress - labelWidth / 2));
-        label.style.left = `${newLeft}px`;
-      }
-      
-      function updateModelByTime(time) {
-        // 根据时间更新模型状态
-        const progress = time / timeMax;
-        
-        // 更新病害点大小（模拟病害发展）
-        defects.forEach((defect, index) => {
-          const baseSize = 0.5;
-          const maxSize = 1.0;
-          const growthRate = (index + 1) * 0.1; // 不同病害点有不同的增长速度
-          const currentSize = baseSize + (maxSize - baseSize) * Math.min(progress * growthRate, 1);
-          
-          defect.scale.set(currentSize, currentSize, currentSize);
-        });
-        
-        // 更新健康评分（随时间降低）
-        const initialScore = 85;
-        const finalScore = 60;
-        const currentScore = initialScore - (initialScore - finalScore) * progress;
-        
-        document.querySelector('#bridge-info .text-yellow-400.font-medium').textContent = 
-          Math.round(currentScore) + '/100';
-        
-        // 更新传感器数据
-        sensors.forEach((sensor, index) => {
-          const initialValue = [30, 45, 65, 40][index];
-          const finalValue = [35, 55, 80, 45][index];
-          const currentValue = initialValue + (finalValue - initialValue) * progress;
-          
-          // 更新数据指示器颜色
-          const dataIndicator = sensor.children[1];
-          if (currentValue > 70) {
-            dataIndicator.material.color.set(0xEF4444);
-          } else if (currentValue > 40) {
-            dataIndicator.material.color.set(0xFACC15);
-          } else {
-            dataIndicator.material.color.set(0x10B981);
-          }
-        });
-      }
+      // 创建箱梁断面辅助线
+      const sectionHelper = createSectionHelper();
+      scene.add(sectionHelper);
+      sectionHelper.visible = false;
       
       // 动画循环
       function animate() {
@@ -1810,184 +832,89 @@
         // 更新控制器
         controls.update();
         
-        // 更新时间轴
-        updateTimeline();
-        
-        // 更新病害点脉冲动画
-        defects.forEach(defect => {
-          defect.userData.pulseScale += 0.02 * defect.userData.pulseDirection;
-          if (defect.userData.pulseScale > 1.2 || defect.userData.pulseScale < 1.0) {
-            defect.userData.pulseDirection *= -1;
-          }
-          defect.children[1].scale.set(
-            defect.userData.pulseScale,
-            defect.userData.pulseScale,
-            defect.userData.pulseScale
-          );
-        });
+        // 更新裂缝动画
+        updateCrackAnimation();
         
         // 渲染场景
         renderer.render(scene, camera);
       }
       
-      // 初始化显示模式为标准视图
-      setDisplayMode('normal');
-      
-      // 隐藏加载指示器
-      setTimeout(() => {
-        document.getElementById('loading-indicator').style.display = 'none';
-      }, 1500);
-      
       // 启动动画
       animate();
       
-      // 事件监听 - 窗口大小变化
+      // 窗口大小变化处理
       window.addEventListener('resize', () => {
-        const newWidth = container.clientWidth;
-        const newHeight = container.clientHeight;
-        
-        camera.aspect = newWidth / newHeight;
+        camera.aspect = container.clientWidth / container.clientHeight;
         camera.updateProjectionMatrix();
-        
-        renderer.setSize(newWidth, newHeight);
+        renderer.setSize(container.clientWidth, container.clientHeight);
       });
       
-      // 功能按钮事件监听
-      document.getElementById('stress-mode').addEventListener('click', () => {
-        setDisplayMode('stress');
-        updateModeButtons('stress');
-      });
-      
-      document.getElementById('sensor-mode').addEventListener('click', () => {
-        setDisplayMode('sensor');
-        updateModeButtons('sensor');
-      });
-      
-      document.getElementById('health-mode').addEventListener('click', () => {
-        setDisplayMode('health');
-        updateModeButtons('health');
-      });
-      
-      document.getElementById('normal-mode').addEventListener('click', () => {
-        setDisplayMode('normal');
-        updateModeButtons('normal');
-      });
-      
-      // 更新模式按钮状态
-      function updateModeButtons(activeMode) {
-        const buttons = ['stress', 'sensor', 'health', 'normal'];
-        buttons.forEach(mode => {
-          const button = document.getElementById(mode + '-mode');
-          if (mode === activeMode) {
-            button.classList.remove('bg-gray-800', 'text-gray-400', 'border-gray-700/50');
-            button.classList.add('bg-accent/10', 'text-accent', 'border-accent/30');
-          } else {
-            button.classList.remove('bg-accent/10', 'text-accent', 'border-accent/30');
-            button.classList.add('bg-gray-800', 'text-gray-400', 'border-gray-700/50');
-          }
-        });
-      }
-      
-      // 透明度滑块事件监听
-      document.getElementById('opacity-slider').addEventListener('input', (e) => {
-        const opacity = e.target.value;
-        document.getElementById('opacity-value').textContent = opacity + '%';
-        setVisualizationOpacity(opacity);
-      });
-      
-      // 病害点显示切换
-      document.getElementById('show-defects').addEventListener('change', (e) => {
-        toggleDefects(e.target.checked);
-      });
-      
-      // 传感器显示切换
-      document.getElementById('show-sensors').addEventListener('change', (e) => {
-        toggleSensors(e.target.checked);
-      });
-      
-      // 时间轴控制
-      document.getElementById('play-btn').addEventListener('click', () => {
-        isPlaying = true;
-      });
-      
-      document.getElementById('pause-btn').addEventListener('click', () => {
-        isPlaying = false;
-      });
-      
-      document.getElementById('reset-btn').addEventListener('click', () => {
-        isPlaying = false;
-        currentTime = 0;
-        updateTimeDisplay();
-        updateModelByTime(currentTime);
-      });
-      
-      document.getElementById('time-slider').addEventListener('input', (e) => {
-        currentTime = parseFloat(e.target.value);
-        updateTimeDisplay();
-        updateModelByTime(currentTime);
-      });
-      
-      // 视图控制
-      document.getElementById('zoom-in').addEventListener('click', () => {
-        camera.position.multiplyScalar(0.8);
-      });
-      
-      document.getElementById('zoom-out').addEventListener('click', () => {
-        camera.position.multiplyScalar(1.2);
-      });
-      
-      document.getElementById('reset-view').addEventListener('click', () => {
-        camera.position.set(0, 15, 30);
-        camera.lookAt(0, 0, 0);
-        controls.reset();
-      });
-      
-      // 模拟点击交互（实际应用中应使用射线检测）
-      let infoTooltip = document.getElementById('info-tooltip');
-      let tooltipTitle = document.getElementById('tooltip-title');
-      let tooltipContent = document.getElementById('tooltip-content');
+      // 模拟点击交互（射线检测）
+      let raycaster = new THREE.Raycaster();
+      let mouse = new THREE.Vector2();
       
       renderer.domElement.addEventListener('click', (event) => {
-        // 在实际应用中，这里应该使用射线检测来确定点击了哪个对象
-        // 这里简化处理，随机显示一个病害点的信息
+        // 计算鼠标在标准化设备坐标中的位置
+        mouse.x = (event.clientX / container.clientWidth) * 2 - 1;
+        mouse.y = -(event.clientY / container.clientHeight) * 2 + 1;
         
-        const defectTypes = ['裂缝', '溶洞', '钢筋锈蚀'];
-        const randomDefect = defectTypes[Math.floor(Math.random() * defectTypes.length)];
+        // 更新射线投射器
+        raycaster.setFromCamera(mouse, camera);
         
-        tooltipTitle.textContent = `病害点详情 - ${randomDefect}`;
+        // 计算物体和射线的焦点
+        const intersects = raycaster.intersectObjects(defectGroup.children, true);
+        
+        if (intersects.length > 0) {
+          const defect = intersects[0].object;
+          showDefectInfo(defect.userData);
+        }
+      });
+      
+      // 显示病害信息
+      function showDefectInfo(defectData) {
+        const tooltip = document.getElementById('info-tooltip');
+        const tooltipTitle = document.getElementById('tooltip-title');
+        const tooltipContent = document.getElementById('tooltip-content');
+        
+        tooltipTitle.textContent = defectData.title;
         tooltipContent.innerHTML = `
-          <div>位置: X: ${(Math.random() * 20 - 10).toFixed(2)}, Y: 5.00, Z: ${(Math.random() * 10 - 5).toFixed(2)}</div>
-          <div>严重程度: ${['轻微', '中度', '严重'][Math.floor(Math.random() * 3)]}</div>
-          <div>检测时间: 2024-10-18 14:35</div>
-          <div>上次更新: 2024-10-20 09:15</div>
+          <div>位置: ${defectData.location}</div>
+          <div>类型: ${defectData.type}</div>
+          <div>严重程度: ${defectData.severity}</div>
+          <div>测量值: ${defectData.value}</div>
+          <div class="mt-2 text-accent cursor-pointer hover:underline" id="show-detail">点击查看详细分析</div>
         `;
         
-        infoTooltip.style.left = `${event.clientX - container.getBoundingClientRect().left + 10}px`;
-        infoTooltip.style.top = `${event.clientY - container.getBoundingClientRect().top - 10}px`;
-        infoTooltip.classList.remove('hidden');
+        tooltip.style.left = `${event.clientX - container.getBoundingClientRect().left + 10}px`;
+        tooltip.style.top = `${event.clientY - container.getBoundingClientRect().top - 10}px`;
+        tooltip.classList.remove('hidden');
         
         // 点击其他地方关闭提示框
         setTimeout(() => {
           document.addEventListener('click', closeTooltip);
         }, 10);
-      });
+        
+        // 查看详细分析
+        document.getElementById('show-detail').addEventListener('click', () => {
+          showDetailModal(defectData);
+        });
+      }
       
       function closeTooltip(event) {
-        if (!infoTooltip.contains(event.target) && event.target !== renderer.domElement) {
-          infoTooltip.classList.add('hidden');
+        const tooltip = document.getElementById('info-tooltip');
+        if (!tooltip.contains(event.target) && event.target !== renderer.domElement) {
+          tooltip.classList.add('hidden');
           document.removeEventListener('click', closeTooltip);
         }
       }
       
-      // 模态框控制
-      const detailModal = document.getElementById('detail-modal');
-      const closeModal = document.getElementById('close-modal');
-      const modalTitle = document.getElementById('modal-title');
-      const modalContent = document.getElementById('modal-content');
-      
-      // 点击病害点显示详细信息（简化处理）
-      renderer.domElement.addEventListener('dblclick', () => {
-        modalTitle.textContent = '病害详细分析报告';
+      // 显示详细分析模态框
+      function showDetailModal(defectData) {
+        const modal = document.getElementById('detail-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalContent = document.getElementById('modal-content');
+        
+        modalTitle.textContent = `${defectData.title} - 详细分析报告`;
         modalContent.innerHTML = `
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -1995,74 +922,57 @@
               <div class="text-xs text-gray-300 space-y-2">
                 <div class="flex justify-between">
                   <span class="text-gray-400">病害类型:</span>
-                  <span>结构性裂缝</span>
+                  <span>${defectData.type}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-gray-400">位置坐标:</span>
-                  <span>X: -7.85, Y: 5.00, Z: 0.12</span>
+                  <span class="text-gray-400">位置:</span>
+                  <span>${defectData.location}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-400">发现时间:</span>
-                  <span>2024-03-15</span>
+                  <span>${defectData.discoveryDate}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-400">最新测量:</span>
-                  <span>2024-10-18</span>
+                  <span>${defectData.lastUpdate}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-400">风险等级:</span>
-                  <span class="text-yellow-400">警告</span>
+                  <span class="text-${defectData.severityLevel === 'high' ? 'danger' : defectData.severityLevel === 'medium' ? 'warning' : 'success'}">${defectData.severity}</span>
                 </div>
               </div>
             </div>
             <div>
               <h4 class="text-sm font-medium text-accent mb-3">详细参数</h4>
               <div class="text-xs text-gray-300 space-y-2">
+                ${defectData.details.map(detail => `
                 <div class="flex justify-between">
-                  <span class="text-gray-400">裂缝长度:</span>
-                  <span>1.52m</span>
+                  <span class="text-gray-400">${detail.label}:</span>
+                  <span>${detail.value}</span>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-400">最大宽度:</span>
-                  <span>3.2mm</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-400">深度估计:</span>
-                  <span>8.5cm</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-400">扩展速率:</span>
-                  <span>0.2mm/月</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-400">影响范围:</span>
-                  <span>主梁应力区</span>
-                </div>
+                `).join('')}
               </div>
             </div>
           </div>
-          <div>
+          <div class="mt-6">
             <h4 class="text-sm font-medium text-accent mb-3">演变历程</h4>
-            <div class="h-[150px] mb-3">
+            <div class="h-[150px] mb-4">
               <canvas id="defectHistoryChart"></canvas>
             </div>
           </div>
           <div>
             <h4 class="text-sm font-medium text-accent mb-3">分析结论与建议</h4>
-            <div class="text-xs text-gray-300 bg-gray-800/50 p-3 rounded">
-              <p>该裂缝位于主梁关键受力区域，目前处于中等发展阶段。根据AI预测模型，若不采取措施，预计6个月后将达到危险阈值。</p>
+            <div class="text-xs text-gray-300 bg-primary/50 p-3 rounded">
+              <p>${defectData.analysis}</p>
               <p class="mt-2 font-medium text-yellow-400">建议措施：</p>
               <ul class="list-disc list-inside mt-1 space-y-1">
-                <li>进行局部碳纤维加固处理</li>
-                <li>增加附近区域传感器密度</li>
-                <li>缩短检测周期至每周一次</li>
-                <li>限制重型车辆通行该区域</li>
+                ${defectData.suggestions.map(suggestion => `<li>${suggestion}</li>`).join('')}
               </ul>
             </div>
           </div>
         `;
         
-        detailModal.classList.remove('hidden');
+        modal.classList.remove('hidden');
         
         // 初始化历史图表
         setTimeout(() => {
@@ -2070,12 +980,12 @@
           new Chart(historyCtx, {
             type: 'line',
             data: {
-              labels: ['3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月'],
+              labels: defectData.trendData.labels,
               datasets: [{
-                label: '裂缝宽度(mm)',
-                data: [1.2, 1.5, 1.8, 2.1, 2.4, 2.7, 3.0, 3.2],
-                borderColor: '#EF4444',
-                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                label: defectData.trendData.label,
+                data: defectData.trendData.values,
+                borderColor: defectData.color,
+                backgroundColor: `${defectData.color}20`,
                 tension: 0.4,
                 fill: true
               }]
@@ -2115,29 +1025,1437 @@
             }
           });
         }, 100);
+      }
+      
+      // 关闭模态框
+      document.getElementById('close-modal').addEventListener('click', () => {
+        document.getElementById('detail-modal').classList.add('hidden');
       });
       
-      closeModal.addEventListener('click', () => {
-        detailModal.classList.add('hidden');
-      });
-      
-      detailModal.addEventListener('click', (event) => {
-        if (event.target === detailModal) {
-          detailModal.classList.add('hidden');
+      // 点击模态框外部关闭
+      document.getElementById('detail-modal').addEventListener('click', (event) => {
+        if (event.target === document.getElementById('detail-modal')) {
+          document.getElementById('detail-modal').classList.add('hidden');
         }
       });
       
-      // 登出按钮事件
+      // 数据分析面板控制
+      document.getElementById('show-analysis').addEventListener('click', () => {
+        document.getElementById('analysis-panel').classList.remove('hidden');
+        initCharts();
+      });
+      
+      document.getElementById('close-analysis').addEventListener('click', () => {
+        document.getElementById('analysis-panel').classList.add('hidden');
+      });
+      
+      // 快速导航控制
+      document.getElementById('view-main-pier').addEventListener('click', () => {
+        controls.target.set(-60, 5, 0);
+        camera.position.set(-120, 30, 20);
+        camera.lookAt(-60, 5, 0);
+      });
+      
+      document.getElementById('view-beam-bottom').addEventListener('click', () => {
+        controls.target.set(0, 0, 0);
+        camera.position.set(0, -30, 100);
+        camera.lookAt(0, 0, 0);
+      });
+      
+      document.getElementById('view-mid-span').addEventListener('click', () => {
+        controls.target.set(0, 15, 0);
+        camera.position.set(0, 30, 100);
+        camera.lookAt(0, 15, 0);
+      });
+      
+      document.getElementById('view-bearing').addEventListener('click', () => {
+        controls.target.set(-60, 10, 0);
+        camera.position.set(-90, 20, 30);
+        camera.lookAt(-60, 10, 0);
+      });
+      
+      document.getElementById('view-deck').addEventListener('click', () => {
+        controls.target.set(30, 20, 0);
+        camera.position.set(60, 40, 10);
+        camera.lookAt(30, 20, 0);
+      });
+      
+      document.getElementById('view-guardrail').addEventListener('click', () => {
+        controls.target.set(-30, 22, 3);
+        camera.position.set(-60, 30, 10);
+        camera.lookAt(-30, 22, 3);
+      });
+      
+      document.getElementById('view-section').addEventListener('click', () => {
+        sectionHelper.visible = !sectionHelper.visible;
+        controls.target.set(0, 15, 0);
+        camera.position.set(0, 30, 150);
+        camera.lookAt(0, 15, 0);
+      });
+      
+      // 显示模式切换
+      document.getElementById('normal-mode').addEventListener('click', () => {
+        setDisplayMode('normal');
+      });
+      
+      document.getElementById('stress-mode').addEventListener('click', () => {
+        setDisplayMode('stress');
+      });
+      
+      document.getElementById('defect-mode').addEventListener('click', () => {
+        setDisplayMode('defect');
+      });
+      
+      document.getElementById('section-mode').addEventListener('click', () => {
+        setDisplayMode('section');
+      });
+      
+      // 设置显示模式
+      function setDisplayMode(mode) {
+        // 重置所有按钮状态
+        const buttons = ['normal', 'stress', 'defect', 'section'];
+        buttons.forEach(btn => {
+          document.getElementById(`${btn}-mode`).classList.remove('bg-accent/10', 'text-accent', 'border-accent/30');
+          document.getElementById(`${btn}-mode`).classList.add('bg-gray-800', 'text-gray-400', 'border-gray-700/50');
+        });
+        
+        // 设置当前按钮状态
+        document.getElementById(`${mode}-mode`).classList.remove('bg-gray-800', 'text-gray-400', 'border-gray-700/50');
+        document.getElementById(`${mode}-mode`).classList.add('bg-accent/10', 'text-accent', 'border-accent/30');
+        
+        // 根据模式切换显示
+        switch (mode) {
+          case 'normal':
+            // 标准视图
+            bridgeGroup.traverse(child => {
+              if (child.material) {
+                child.material.opacity = parseFloat(document.getElementById('opacity-slider').value) / 100;
+                child.material.transparent = child.material.opacity < 1;
+              }
+            });
+            sectionHelper.visible = false;
+            break;
+          case 'stress':
+            // 应力分布视图
+            applyStressMap();
+            sectionHelper.visible = false;
+            break;
+          case 'defect':
+            // 病害标注视图
+            highlightDefects();
+            sectionHelper.visible = false;
+            break;
+          case 'section':
+            // 断面视图
+            sectionHelper.visible = true;
+            break;
+        }
+      }
+      
+      // 应用应力分布图
+      function applyStressMap() {
+        // 这里可以实现应力分布图的应用逻辑
+      }
+      
+      // 高亮病害
+      function highlightDefects() {
+        // 这里可以实现病害高亮的逻辑
+      }
+      
+      // 透明度控制
+      document.getElementById('opacity-slider').addEventListener('input', (e) => {
+        const opacity = e.target.value;
+        document.getElementById('opacity-value').textContent = opacity + '%';
+        
+        bridgeGroup.traverse(child => {
+          if (child.material) {
+            child.material.opacity = opacity / 100;
+            child.material.transparent = opacity / 100 < 1;
+          }
+        });
+      });
+      
+      // 病害显示控制
+      const defectToggles = ['cracks', 'deformation', 'bearings', 'spalling', 'rust'];
+      defectToggles.forEach(type => {
+        document.getElementById(`show-${type}`).addEventListener('change', (e) => {
+          toggleDefectType(type, e.target.checked);
+        });
+      });
+      
+      function toggleDefectType(type, show) {
+        defectGroup.traverse(child => {
+          if (child.userData && child.userData.type === type) {
+            child.visible = show;
+          }
+        });
+      }
+      
+      // 登出按钮
       document.getElementById('logout-button').addEventListener('click', () => {
         if (confirm('确定要退出登录吗？')) {
-          window.location.href = 'index.html';
+          // 跳转到登录页面
+          window.location.href = '\\index.html';
         }
+      });
+      
+      // 隐藏加载指示器
+      setTimeout(() => {
+        document.getElementById('loading-indicator').style.display = 'none';
+      }, 1000);
+    }
+    
+    // 创建地面纹理
+    function createGroundTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 1024;
+      const ctx = canvas.getContext('2d');
+      
+      // 填充基础颜色（喀斯特地形的棕褐色）
+      ctx.fillStyle = '#5D4037';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // 添加岩石纹理
+      for (let i = 0; i < 1000; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const size = 5 + Math.random() * 20;
+        const grayness = 150 + Math.random() * 50;
+        
+        ctx.fillStyle = `rgb(${grayness}, ${grayness - 20}, ${grayness - 40})`;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      // 添加一些绿色植被点缀
+      for (let i = 0; i < 500; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const size = 2 + Math.random() * 8;
+        
+        ctx.fillStyle = `rgb(34, 197, 94, ${0.2 + Math.random() * 0.3})`;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(5, 5);
+      return texture;
+    }
+    
+    // 创建吊索桥
+    function createSuspensionBridge(bridgeGroup, concreteMaterial, steelMaterial) {
+      // 桥梁参数
+      const totalLength = 260; // 总长260米
+      const mainSpan = 120; // 主跨长度
+      const sideSpan = 70; // 边跨长度
+      const deckWidth = 12; // 桥面宽度
+      const beamHeight = 2.5; // 梁高（吊索桥主梁更轻）
+      const towerHeight = 80; // 索塔高度
+      
+      // 创建索塔基础
+      createTowerFoundation(bridgeGroup, concreteMaterial, -mainSpan/2, 5);
+      createTowerFoundation(bridgeGroup, concreteMaterial, mainSpan/2, 5);
+      
+      // 创建索塔
+      createTower(bridgeGroup, concreteMaterial, steelMaterial, -mainSpan/2, towerHeight);
+      createTower(bridgeGroup, concreteMaterial, steelMaterial, mainSpan/2, towerHeight);
+      
+      // 创建桥台（锚碇）
+      createAbutment(bridgeGroup, concreteMaterial, -totalLength / 2, 15);
+      createAbutment(bridgeGroup, concreteMaterial, totalLength / 2, 15);
+      
+      // 创建桥台基础
+      createAbutmentFoundation(bridgeGroup, concreteMaterial, -totalLength / 2, 3);
+      createAbutmentFoundation(bridgeGroup, concreteMaterial, totalLength / 2, 3);
+      
+      // 创建主梁（轻量化设计）
+      createMainBeam(bridgeGroup, concreteMaterial, totalLength, deckWidth, beamHeight, beamHeight, sideSpan, mainSpan, sideSpan);
+    }
+    
+    // 创建山体函数
+    function createMountains(mountainsGroup, leftBridgeEnd, rightBridgeEnd) {
+      // 左侧山体
+      createSingleMountain(mountainsGroup, leftBridgeEnd - 150, 0, -50, 100, 200, 120, 0x5C6F48);
+      createSingleMountain(mountainsGroup, leftBridgeEnd - 100, -80, -40, 80, 150, 100, 0x6A7E55);
+      createSingleMountain(mountainsGroup, leftBridgeEnd - 120, 80, -30, 70, 180, 90, 0x73895A);
+      
+      // 右侧山体
+      createSingleMountain(mountainsGroup, rightBridgeEnd + 150, 0, -50, 100, 200, 120, 0x5C6F48);
+      createSingleMountain(mountainsGroup, rightBridgeEnd + 100, -80, -40, 80, 150, 100, 0x6A7E55);
+      createSingleMountain(mountainsGroup, rightBridgeEnd + 120, 80, -30, 70, 180, 90, 0x73895A);
+    }
+    
+    // 创建单个山体
+    function createSingleMountain(parentGroup, x, z, yMin, height, width, depth, color) {
+      // 使用Perlin噪声创建不规则的山体形状
+      const mountainGeometry = new THREE.BoxGeometry(width, height, depth, 32, 32, 32);
+      
+      // 生成不规则的山体顶点
+      const positions = mountainGeometry.attributes.position.array;
+      for (let i = 0; i < positions.length; i += 3) {
+        // 仅修改Y轴（高度），保持X和Z相对不变
+        if (positions[i + 1] > yMin) {
+          // 添加一些随机性使山体更自然
+          const randomFactor = (Math.sin(positions[i] * 0.02) * Math.cos(positions[i + 2] * 0.02) * 0.5 + 0.5) * 0.3;
+          positions[i + 1] = positions[i + 1] * (1 + randomFactor);
+        }
+      }
+      mountainGeometry.attributes.position.needsUpdate = true;
+      mountainGeometry.computeVertexNormals();
+      
+      // 创建材质
+      const mountainMaterial = new THREE.MeshStandardMaterial({
+        color: color,
+        roughness: 0.7,
+        metalness: 0.1
+      });
+      
+      const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
+      mountain.position.set(x, yMin + height / 2, z);
+      mountain.receiveShadow = true;
+      mountain.castShadow = true;
+      
+      // 添加一些树木点缀
+      addTreesToMountain(mountain, color);
+      
+      parentGroup.add(mountain);
+    }
+    
+    // 给山体添加树木
+    function addTreesToMountain(mountain, baseColor) {
+      const treeGroup = new THREE.Group();
+      mountain.add(treeGroup);
+      
+      // 创建一些随机树木
+      const treeCount = Math.floor(Math.random() * 20) + 10;
+      
+      for (let i = 0; i < treeCount; i++) {
+        // 在山体表面随机位置
+        const treeX = (Math.random() - 0.5) * mountain.geometry.parameters.width * 0.8;
+        const treeZ = (Math.random() - 0.5) * mountain.geometry.parameters.depth * 0.8;
+        
+        // 估算该位置的山体高度
+        const height = getMountainHeightAt(mountain, treeX, treeZ);
+        if (height > 0) {
+          // 创建树干
+          const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2);
+          const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x5D4037 });
+          const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+          
+          // 创建树冠
+          const crownGeometry = new THREE.ConeGeometry(2, 3, 8);
+          const leafColor = baseColor.replace('0x', '0x') * 0.8 + 0x222211;
+          const crownMaterial = new THREE.MeshStandardMaterial({ color: leafColor });
+          const crown = new THREE.Mesh(crownGeometry, crownMaterial);
+          
+          // 组装树木
+          trunk.position.set(treeX, height + 1, treeZ);
+          crown.position.set(treeX, height + 3, treeZ);
+          
+          treeGroup.add(trunk);
+          treeGroup.add(crown);
+        }
+      }
+    }
+    
+    // 获取山体指定位置的高度（简化计算）
+    function getMountainHeightAt(mountain, x, z) {
+      // 这是一个简化的高度估算，基于Perlin噪声原理
+      const width = mountain.geometry.parameters.width;
+      const depth = mountain.geometry.parameters.depth;
+      const maxHeight = mountain.geometry.parameters.height;
+      
+      // 计算相对于山体中心的位置
+      const relX = x / (width / 2);
+      const relZ = z / (depth / 2);
+      
+      // 计算到中心的距离
+      const distance = Math.sqrt(relX * relX + relZ * relZ);
+      
+      // 基于距离和一些噪声生成高度
+      if (distance < 0.8) { // 只在山体范围内
+        const noise = Math.sin(x * 0.02) * Math.cos(z * 0.02);
+        return (1 - distance * 1.25) * maxHeight * 0.6 + noise * maxHeight * 0.1;
+      }
+      return 0;
+    }
+      
+      // 创建主缆和吊索
+      createCablesAndHangers(bridgeGroup, steelMaterial, totalLength, mainSpan, deckWidth, towerHeight);
+      
+      // 创建桥面系
+      createDeckSystem(bridgeGroup, concreteMaterial, steelMaterial, totalLength, deckWidth);
+      
+      // 创建支座（少量用于辅助支撑）
+      createBearings(bridgeGroup, steelMaterial, -totalLength / 2, beamHeight / 2);
+      createBearings(bridgeGroup, steelMaterial, totalLength / 2, beamHeight / 2);
+    }
+    
+    // 创建索塔
+    function createTower(bridgeGroup, concreteMaterial, steelMaterial, xPos, height) {
+      const towerGroup = new THREE.Group();
+      
+      // 索塔主体（双塔柱）
+      const towerWidth = 8;
+      const towerThickness = 2;
+      const columnSpacing = 6;
+      
+      // 左侧塔柱
+      const leftColumnGeometry = new THREE.BoxGeometry(towerThickness, height, towerThickness);
+      const leftColumn = new THREE.Mesh(leftColumnGeometry, concreteMaterial);
+      leftColumn.position.set(-columnSpacing/2, height/2, 0);
+      leftColumn.castShadow = true;
+      leftColumn.receiveShadow = true;
+      towerGroup.add(leftColumn);
+      
+      // 右侧塔柱
+      const rightColumn = new THREE.Mesh(leftColumnGeometry, concreteMaterial);
+      rightColumn.position.set(columnSpacing/2, height/2, 0);
+      rightColumn.castShadow = true;
+      rightColumn.receiveShadow = true;
+      towerGroup.add(rightColumn);
+      
+      // 塔柱连接梁（多道横梁）
+      const beamGeometry = new THREE.BoxGeometry(columnSpacing + towerThickness, 1, towerThickness);
+      const beam1 = new THREE.Mesh(beamGeometry, concreteMaterial);
+      beam1.position.set(0, height * 0.3, 0);
+      towerGroup.add(beam1);
+      
+      const beam2 = new THREE.Mesh(beamGeometry, concreteMaterial);
+      beam2.position.set(0, height * 0.6, 0);
+      towerGroup.add(beam2);
+      
+      // 塔顶鞍座
+      const saddleGeometry = new THREE.BoxGeometry(0.5, 2, columnSpacing + 2);
+      const saddle = new THREE.Mesh(saddleGeometry, steelMaterial);
+      saddle.position.set(0, height + 1, 0);
+      towerGroup.add(saddle);
+      
+      towerGroup.position.x = xPos;
+      bridgeGroup.add(towerGroup);
+    }
+    
+    // 创建索塔基础
+    function createTowerFoundation(bridgeGroup, concreteMaterial, xPos, height) {
+      const foundationGroup = new THREE.Group();
+      
+      // 扩大基础
+      const foundationGeometry = new THREE.BoxGeometry(15, height, 15);
+      const foundation = new THREE.Mesh(foundationGeometry, concreteMaterial);
+      foundation.position.set(0, height / 2 - 10, 0); // 放置在地面以下
+      foundation.castShadow = true;
+      foundation.receiveShadow = true;
+      foundationGroup.add(foundation);
+      
+      // 深桩基础（16根桩）
+      const pileRadius = 0.6;
+      const pileLength = 25;
+      const pileGeometry = new THREE.CylinderGeometry(pileRadius, pileRadius, pileLength, 12);
+      
+      for (let i = -6; i <= 6; i += 4) {
+        for (let j = -6; j <= 6; j += 4) {
+          const pile = new THREE.Mesh(pileGeometry, concreteMaterial);
+          pile.position.set(i, -10 - pileLength / 2 + height, j);
+          pile.rotation.x = Math.PI / 2;
+          pile.castShadow = true;
+          pile.receiveShadow = true;
+          foundationGroup.add(pile);
+        }
+      }
+      
+      foundationGroup.position.x = xPos;
+      bridgeGroup.add(foundationGroup);
+    }
+    
+    // 创建主缆和吊索
+    function createCablesAndHangers(bridgeGroup, steelMaterial, totalLength, mainSpan, deckWidth, towerHeight) {
+      const cablesGroup = new THREE.Group();
+      
+      // 创建主缆材质
+      const cableMaterial = new THREE.MeshStandardMaterial({ color: 0xAAAAAA, metalness: 0.8, roughness: 0.2 });
+      const hangerMaterial = new THREE.MeshStandardMaterial({ color: 0xCCCCCC, metalness: 0.9, roughness: 0.1 });
+      
+      // 主缆弧度参数
+      const sag = towerHeight * 0.3; // 主缆垂度
+      
+      // 创建左侧主缆
+      createMainCable(cablesGroup, cableMaterial, -totalLength/2, -mainSpan/2, towerHeight, sag, deckWidth/2 + 1);
+      // 创建右侧主缆
+      createMainCable(cablesGroup, cableMaterial, mainSpan/2, totalLength/2, towerHeight, sag, deckWidth/2 + 1);
+      // 创建中央主缆
+      createMainCable(cablesGroup, cableMaterial, -mainSpan/2, mainSpan/2, towerHeight, sag, deckWidth/2 + 1);
+      
+      // 创建吊索
+      const hangerCount = 16; // 每侧吊索数量
+      createHangers(cablesGroup, hangerMaterial, -mainSpan/2, mainSpan/2, towerHeight, sag, deckWidth, hangerCount);
+      
+      bridgeGroup.add(cablesGroup);
+    }
+    
+    // 创建单根主缆
+    function createMainCable(parentGroup, material, startX, endX, towerHeight, sag, zPos) {
+      const curvePoints = [];
+      const steps = 50;
+      
+      // 抛物线公式：y = (4h/L²)(Lx - x²)
+      // 其中h是垂度，L是跨度
+      const L = Math.abs(endX - startX);
+      const h = sag;
+      
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const x = startX + (endX - startX) * t;
+        const relativeX = x - startX;
+        
+        // 计算抛物线y值
+        let y;
+        if (startX === -130 && endX === -60) { // 左侧缆索
+          y = towerHeight - h + (4 * h / (L * L)) * relativeX * (L - relativeX);
+        } else if (startX === 60 && endX === 130) { // 右侧缆索
+          y = towerHeight - h + (4 * h / (L * L)) * relativeX * (L - relativeX);
+        } else { // 中央缆索（主跨）
+          y = towerHeight - h + (4 * h / (L * L)) * relativeX * (L - relativeX);
+        }
+        
+        curvePoints.push(new THREE.Vector3(x, y, zPos));
+      }
+      
+      // 创建曲线
+      const curve = new THREE.CatmullRomCurve3(curvePoints);
+      
+      // 创建主缆几何体
+      const tubeGeometry = new THREE.TubeGeometry(curve, 100, 0.3, 8, false);
+      const cable = new THREE.Mesh(tubeGeometry, material);
+      cable.castShadow = true;
+      parentGroup.add(cable);
+      
+      // 创建另一侧主缆（对称）
+      const mirroredCurvePoints = curvePoints.map(point => 
+        new THREE.Vector3(point.x, point.y, -point.z)
+      );
+      const mirroredCurve = new THREE.CatmullRomCurve3(mirroredCurvePoints);
+      const mirroredTubeGeometry = new THREE.TubeGeometry(mirroredCurve, 100, 0.3, 8, false);
+      const mirroredCable = new THREE.Mesh(mirroredTubeGeometry, material);
+      mirroredCable.castShadow = true;
+      parentGroup.add(mirroredCable);
+    }
+    
+    // 创建吊索
+    function createHangers(parentGroup, material, startX, endX, towerHeight, sag, deckWidth, hangerCount) {
+      const L = Math.abs(endX - startX);
+      const h = sag;
+      const spacing = L / (hangerCount + 1);
+      
+      // 主梁高度（假设）
+      const deckHeight = 5.1;
+      
+      for (let i = 1; i <= hangerCount; i++) {
+        const x = startX + spacing * i;
+        const relativeX = x - startX;
+        
+        // 计算吊索上端点位置（基于主缆抛物线）
+        const cableY = towerHeight - h + (4 * h / (L * L)) * relativeX * (L - relativeX);
+        
+        // 创建左侧吊索
+        const leftHangerLength = cableY - deckHeight;
+        const leftHangerGeometry = new THREE.CylinderGeometry(0.1, 0.1, leftHangerLength, 8);
+        const leftHanger = new THREE.Mesh(leftHangerGeometry, material);
+        leftHanger.position.set(x, (cableY + deckHeight) / 2, deckWidth/2 - 1);
+        leftHanger.castShadow = true;
+        parentGroup.add(leftHanger);
+        
+        // 创建右侧吊索
+        const rightHanger = new THREE.Mesh(leftHangerGeometry, material);
+        rightHanger.position.set(x, (cableY + deckHeight) / 2, -deckWidth/2 + 1);
+        rightHanger.castShadow = true;
+        parentGroup.add(rightHanger);
+        
+        // 创建中间吊索（每两个外侧吊索中间添加一个）
+        if (i % 2 === 0) {
+          const midHanger = new THREE.Mesh(leftHangerGeometry, material);
+          midHanger.position.set(x, (cableY + deckHeight) / 2, 0);
+          midHanger.castShadow = true;
+          parentGroup.add(midHanger);
+        }
+      }
+    }
+    
+    // 创建主梁（单箱单室预应力混凝土箱梁）
+    function createMainBeam(bridgeGroup, concreteMaterial, totalLength, deckWidth, midspanHeight, pierHeight, span1, span2, span3) {
+      const beamGroup = new THREE.Group();
+      
+      // 分段创建主梁，模拟梁高变化
+      const segments = 20; // 每跨的分段数
+      const totalSegments = segments * 3;
+      const segmentLength = totalLength / totalSegments;
+      
+      for (let i = 0; i < totalSegments; i++) {
+        const x = -totalLength / 2 + i * segmentLength + segmentLength / 2;
+        
+        // 计算当前位置的梁高（跨中较薄，墩顶处较厚）
+        let currentHeight;
+        if (x < -span1 / 2) {
+          // 第一跨
+          const ratio = (x + totalLength / 2) / span1;
+          currentHeight = pierHeight - (pierHeight - midspanHeight) * Math.sin(ratio * Math.PI);
+        } else if (x > span1 / 2) {
+          // 第三跨
+          const ratio = (totalLength / 2 - x) / span3;
+          currentHeight = pierHeight - (pierHeight - midspanHeight) * Math.sin(ratio * Math.PI);
+        } else {
+          // 第二跨（中跨）
+          const ratio = (x + span1 / 2 + span2 / 2) / span2;
+          currentHeight = pierHeight - (pierHeight - midspanHeight) * Math.sin(ratio * Math.PI);
+        }
+        
+        // 创建箱梁段（单箱单室）
+        const outerWidth = deckWidth;
+        const outerHeight = currentHeight;
+        const innerWidth = outerWidth - 2; // 壁厚1米
+        const innerHeight = outerHeight - 1; // 顶底板厚度0.5米
+        
+        // 使用多个Box几何体创建箱梁
+        // 顶板
+        const topPlateGeometry = new THREE.BoxGeometry(segmentLength, 0.5, outerWidth);
+        const topPlate = new THREE.Mesh(topPlateGeometry, concreteMaterial);
+        topPlate.position.set(x, outerHeight / 2, 0);
+        topPlate.castShadow = true;
+        topPlate.receiveShadow = true;
+        beamGroup.add(topPlate);
+        
+        // 底板
+        const bottomPlateGeometry = new THREE.BoxGeometry(segmentLength, 0.5, outerWidth);
+        const bottomPlate = new THREE.Mesh(bottomPlateGeometry, concreteMaterial);
+        bottomPlate.position.set(x, -outerHeight / 2, 0);
+        bottomPlate.castShadow = true;
+        bottomPlate.receiveShadow = true;
+        beamGroup.add(bottomPlate);
+        
+        // 左侧腹板
+        const leftWebGeometry = new THREE.BoxGeometry(segmentLength, innerHeight, 0.5);
+        const leftWeb = new THREE.Mesh(leftWebGeometry, concreteMaterial);
+        leftWeb.position.set(x, 0, -innerWidth / 2 - 0.25);
+        leftWeb.castShadow = true;
+        leftWeb.receiveShadow = true;
+        beamGroup.add(leftWeb);
+        
+        // 右侧腹板
+        const rightWebGeometry = new THREE.BoxGeometry(segmentLength, innerHeight, 0.5);
+        const rightWeb = new THREE.Mesh(rightWebGeometry, concreteMaterial);
+        rightWeb.position.set(x, 0, innerWidth / 2 + 0.25);
+        rightWeb.castShadow = true;
+        rightWeb.receiveShadow = true;
+        beamGroup.add(rightWeb);
+        
+        // 中腹板（单箱单室）
+        const midWebGeometry = new THREE.BoxGeometry(segmentLength, innerHeight, 0.5);
+        const midWeb = new THREE.Mesh(midWebGeometry, concreteMaterial);
+        midWeb.position.set(x, 0, 0);
+        midWeb.castShadow = true;
+        midWeb.receiveShadow = true;
+        beamGroup.add(midWeb);
+      }
+      
+      bridgeGroup.add(beamGroup);
+    }
+    
+    // 创建主墩（空心薄壁墩）
+    function createMainPier(bridgeGroup, concreteMaterial, xPos, height, hasDoor = false) {
+      const pierGroup = new THREE.Group();
+      
+      const pierWidth = 6;
+      const pierThickness = 1; // 壁厚
+      
+      // 墩身（空心矩形）
+      // 四个侧面
+      const sideHeight = height;
+      const sideThickness = pierThickness;
+      
+      // 前后侧面
+      const frontSideGeometry = new THREE.BoxGeometry(pierWidth, sideHeight, sideThickness);
+      const frontSide = new THREE.Mesh(frontSideGeometry, concreteMaterial);
+      frontSide.position.set(0, height / 2, pierWidth / 2 - sideThickness / 2);
+      frontSide.castShadow = true;
+      frontSide.receiveShadow = true;
+      pierGroup.add(frontSide);
+      
+      const backSide = new THREE.Mesh(frontSideGeometry, concreteMaterial);
+      backSide.position.set(0, height / 2, -pierWidth / 2 + sideThickness / 2);
+      backSide.castShadow = true;
+      backSide.receiveShadow = true;
+      pierGroup.add(backSide);
+      
+      // 左右侧面
+      const sideWidth = pierWidth - 2 * sideThickness;
+      const leftSideGeometry = new THREE.BoxGeometry(sideThickness, sideHeight, sideWidth);
+      const leftSide = new THREE.Mesh(leftSideGeometry, concreteMaterial);
+      leftSide.position.set(-pierWidth / 2 + sideThickness / 2, height / 2, 0);
+      leftSide.castShadow = true;
+      leftSide.receiveShadow = true;
+      pierGroup.add(leftSide);
+      
+      const rightSide = new THREE.Mesh(leftSideGeometry, concreteMaterial);
+      rightSide.position.set(pierWidth / 2 - sideThickness / 2, height / 2, 0);
+      rightSide.castShadow = true;
+      rightSide.receiveShadow = true;
+      pierGroup.add(rightSide);
+      
+      // 检修门洞
+      if (hasDoor) {
+        const doorHeight = 3;
+        const doorWidth = 2;
+        const doorGeometry = new THREE.BoxGeometry(doorWidth, doorHeight, pierThickness + 0.1);
+        const doorMesh = new THREE.Mesh(doorGeometry, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 }));
+        doorMesh.position.set(0, height / 2 - 5, pierWidth / 2);
+        pierGroup.add(doorMesh);
+        
+        // 添加门的边框
+        const doorFrameGeometry = new THREE.BoxGeometry(doorWidth + 0.2, doorHeight + 0.2, 0.1);
+        const doorFrameMaterial = new THREE.MeshStandardMaterial({ color: 0x444444 });
+        const doorFrame = new THREE.Mesh(doorFrameGeometry, doorFrameMaterial);
+        doorFrame.position.set(0, height / 2 - 5, pierWidth / 2 + pierThickness / 2 + 0.05);
+        pierGroup.add(doorFrame);
+      }
+      
+      // 桥墩顶部（扩大的帽梁）
+      const capBeamGeometry = new THREE.BoxGeometry(pierWidth + 2, 1, pierWidth + 2);
+      const capBeam = new THREE.Mesh(capBeamGeometry, concreteMaterial);
+      capBeam.position.set(0, height + 0.5, 0);
+      capBeam.castShadow = true;
+      capBeam.receiveShadow = true;
+      pierGroup.add(capBeam);
+      
+      pierGroup.position.x = xPos;
+      bridgeGroup.add(pierGroup);
+    }
+    
+    // 创建桥台（重力式U型桥台）
+    function createAbutment(bridgeGroup, concreteMaterial, xPos, height) {
+      const abutmentGroup = new THREE.Group();
+      
+      const width = 15; // 桥台宽度
+      const thickness = 4; // 桥台厚度
+      const wingLength = 10; // 翼墙长度
+      
+      // 桥台主体
+      const mainBodyGeometry = new THREE.BoxGeometry(thickness, height, width);
+      const mainBody = new THREE.Mesh(mainBodyGeometry, concreteMaterial);
+      mainBody.position.set(0, height / 2, 0);
+      mainBody.castShadow = true;
+      mainBody.receiveShadow = true;
+      abutmentGroup.add(mainBody);
+      
+      // 左侧翼墙
+      const leftWingGeometry = new THREE.BoxGeometry(wingLength, height, 1);
+      const leftWing = new THREE.Mesh(leftWingGeometry, concreteMaterial);
+      leftWing.position.set(-wingLength / 2 - thickness / 2, height / 2, width / 2 - 0.5);
+      leftWing.castShadow = true;
+      leftWing.receiveShadow = true;
+      abutmentGroup.add(leftWing);
+      
+      // 右侧翼墙
+      const rightWing = new THREE.Mesh(leftWingGeometry, concreteMaterial);
+      rightWing.position.set(-wingLength / 2 - thickness / 2, height / 2, -width / 2 + 0.5);
+      rightWing.castShadow = true;
+      rightWing.receiveShadow = true;
+      abutmentGroup.add(rightWing);
+      
+      // 台帽
+      const capGeometry = new THREE.BoxGeometry(thickness + 1, 0.8, width + 1);
+      const cap = new THREE.Mesh(capGeometry, concreteMaterial);
+      cap.position.set(0, height + 0.4, 0);
+      cap.castShadow = true;
+      cap.receiveShadow = true;
+      abutmentGroup.add(cap);
+      
+      abutmentGroup.position.x = xPos;
+      bridgeGroup.add(abutmentGroup);
+    }
+    
+    // 创建主墩基础（承台+群桩）
+    function createPierFoundation(bridgeGroup, concreteMaterial, xPos, height) {
+      const foundationGroup = new THREE.Group();
+      
+      // 承台
+      const pileCapGeometry = new THREE.BoxGeometry(10, height, 10);
+      const pileCap = new THREE.Mesh(pileCapGeometry, concreteMaterial);
+      pileCap.position.set(0, height / 2 - 10, 0); // 放置在地面以下
+      pileCap.castShadow = true;
+      pileCap.receiveShadow = true;
+      foundationGroup.add(pileCap);
+      
+      // 群桩基础（9根桩）
+      const pileRadius = 0.5;
+      const pileLength = 15;
+      const pilePositions = [
+        [-3, 0, 3], [-3, 0, 0], [-3, 0, -3],
+        [0, 0, 3], [0, 0, 0], [0, 0, -3],
+        [3, 0, 3], [3, 0, 0], [3, 0, -3]
+      ];
+      
+      const pileGeometry = new THREE.CylinderGeometry(pileRadius, pileRadius, pileLength, 12);
+      
+      pilePositions.forEach(pos => {
+        const pile = new THREE.Mesh(pileGeometry, concreteMaterial);
+        pile.position.set(pos[0], -10 - pileLength / 2 + height, pos[2]);
+        pile.rotation.x = Math.PI / 2; // 垂直放置桩
+        pile.castShadow = true;
+        pile.receiveShadow = true;
+        foundationGroup.add(pile);
+      });
+      
+      foundationGroup.position.x = xPos;
+      bridgeGroup.add(foundationGroup);
+    }
+    
+    // 创建桥台基础
+    function createAbutmentFoundation(bridgeGroup, concreteMaterial, xPos, height) {
+      const foundationGroup = new THREE.Group();
+      
+      // 扩大基础
+      const foundationGeometry = new THREE.BoxGeometry(20, height, 20);
+      const foundation = new THREE.Mesh(foundationGeometry, concreteMaterial);
+      foundation.position.set(0, height / 2 - 10, 0); // 放置在地面以下
+      foundation.castShadow = true;
+      foundation.receiveShadow = true;
+      foundationGroup.add(foundation);
+      
+      foundationGroup.position.x = xPos;
+      bridgeGroup.add(foundationGroup);
+    }
+    
+    // 创建桥面系
+    function createDeckSystem(bridgeGroup, concreteMaterial, steelMaterial, totalLength, deckWidth) {
+      const deckGroup = new THREE.Group();
+      
+      // 创建桥面铺装（沥青混凝土）
+      const pavementGeometry = new THREE.BoxGeometry(totalLength, 0.1, deckWidth - 1);
+      const pavementMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+      const pavement = new THREE.Mesh(pavementGeometry, pavementMaterial);
+      pavement.position.set(0, 5.1, 0); // 放置在主梁上
+      pavement.castShadow = true;
+      pavement.receiveShadow = true;
+      deckGroup.add(pavement);
+      
+      // 创建防撞护栏
+      const guardrailHeight = 1.2;
+      const guardrailWidth = 0.2;
+      const guardrailGeometry = new THREE.BoxGeometry(totalLength, guardrailHeight, guardrailWidth);
+      const guardrailMaterial = new THREE.MeshStandardMaterial({ color: 0xCCCCCC });
+      
+      // 左侧护栏
+      const leftGuardrail = new THREE.Mesh(guardrailGeometry, guardrailMaterial);
+      leftGuardrail.position.set(0, 5.1 + guardrailHeight / 2, (deckWidth - 1) / 2 + guardrailWidth / 2);
+      leftGuardrail.castShadow = true;
+      leftGuardrail.receiveShadow = true;
+      deckGroup.add(leftGuardrail);
+      
+      // 右侧护栏
+      const rightGuardrail = new THREE.Mesh(guardrailGeometry, guardrailMaterial);
+      rightGuardrail.position.set(0, 5.1 + guardrailHeight / 2, -(deckWidth - 1) / 2 - guardrailWidth / 2);
+      rightGuardrail.castShadow = true;
+      rightGuardrail.receiveShadow = true;
+      deckGroup.add(rightGuardrail);
+      
+      // 添加护栏支柱
+      const postHeight = guardrailHeight;
+      const postWidth = 0.15;
+      const postGeometry = new THREE.BoxGeometry(postWidth, postHeight, postWidth);
+      const postMaterial = new THREE.MeshStandardMaterial({ color: 0xAAAAAA });
+      
+      // 左侧护栏支柱
+      for (let i = 0; i < totalLength; i += 3) {
+        const post = new THREE.Mesh(postGeometry, postMaterial);
+        post.position.set(-totalLength / 2 + i + 1.5, 5.1 + postHeight / 2, (deckWidth - 1) / 2);
+        post.castShadow = true;
+        post.receiveShadow = true;
+        deckGroup.add(post);
+      }
+      
+      // 右侧护栏支柱
+      for (let i = 0; i < totalLength; i += 3) {
+        const post = new THREE.Mesh(postGeometry, postMaterial);
+        post.position.set(-totalLength / 2 + i + 1.5, 5.1 + postHeight / 2, -(deckWidth - 1) / 2);
+        post.castShadow = true;
+        post.receiveShadow = true;
+        deckGroup.add(post);
+      }
+      
+      // 添加路灯
+      const lampPostHeight = 6;
+      const lampPostRadius = 0.1;
+      const lampPostGeometry = new THREE.CylinderGeometry(lampPostRadius, lampPostRadius, lampPostHeight, 8);
+      const lampPostMaterial = new THREE.MeshStandardMaterial({ color: 0x666666 });
+      
+      // 灯罩
+      const lampShadeGeometry = new THREE.ConeGeometry(0.3, 0.5, 8);
+      const lampShadeMaterial = new THREE.MeshStandardMaterial({ color: 0xFFFFAA, emissive: 0xFFFFAA, emissiveIntensity: 0.5 });
+      
+      for (let i = 0; i < totalLength; i += 15) {
+        // 左侧路灯
+        const lampPost1 = new THREE.Mesh(lampPostGeometry, lampPostMaterial);
+        lampPost1.position.set(-totalLength / 2 + i + 7.5, 5.1 + lampPostHeight / 2, (deckWidth - 1) / 2 + 0.5);
+        lampPost1.castShadow = true;
+        lampPost1.receiveShadow = true;
+        deckGroup.add(lampPost1);
+        
+        const lampShade1 = new THREE.Mesh(lampShadeGeometry, lampShadeMaterial);
+        lampShade1.position.set(-totalLength / 2 + i + 7.5, 5.1 + lampPostHeight + 0.25, (deckWidth - 1) / 2 + 0.5);
+        lampShade1.castShadow = true;
+        lampShade1.receiveShadow = true;
+        deckGroup.add(lampShade1);
+        
+        // 右侧路灯
+        const lampPost2 = new THREE.Mesh(lampPostGeometry, lampPostMaterial);
+        lampPost2.position.set(-totalLength / 2 + i + 7.5, 5.1 + lampPostHeight / 2, -(deckWidth - 1) / 2 - 0.5);
+        lampPost2.castShadow = true;
+        lampPost2.receiveShadow = true;
+        deckGroup.add(lampPost2);
+        
+        const lampShade2 = new THREE.Mesh(lampShadeGeometry, lampShadeMaterial);
+        lampShade2.position.set(-totalLength / 2 + i + 7.5, 5.1 + lampPostHeight + 0.25, -(deckWidth - 1) / 2 - 0.5);
+        lampShade2.castShadow = true;
+        lampShade2.receiveShadow = true;
+        deckGroup.add(lampShade2);
+      }
+      
+      // 添加伸缩缝（在桥台处）
+      const expansionJointGeometry = new THREE.BoxGeometry(0.5, 0.05, deckWidth - 1);
+      const expansionJointMaterial = new THREE.MeshStandardMaterial({ color: 0x666666 });
+      
+      // 左侧伸缩缝
+      const leftJoint = new THREE.Mesh(expansionJointGeometry, expansionJointMaterial);
+      leftJoint.position.set(-totalLength / 2 + 0.25, 5.1, 0);
+      leftJoint.castShadow = true;
+      leftJoint.receiveShadow = true;
+      deckGroup.add(leftJoint);
+      
+      // 右侧伸缩缝
+      const rightJoint = new THREE.Mesh(expansionJointGeometry, expansionJointMaterial);
+      rightJoint.position.set(totalLength / 2 - 0.25, 5.1, 0);
+      rightJoint.castShadow = true;
+      rightJoint.receiveShadow = true;
+      deckGroup.add(rightJoint);
+      
+      bridgeGroup.add(deckGroup);
+    }
+    
+    // 创建支座
+    function createBearings(bridgeGroup, steelMaterial, xPos, yPos) {
+      const bearingGroup = new THREE.Group();
+      
+      const bearingWidth = 2;
+      const bearingLength = 4;
+      const bearingHeight = 0.5;
+      
+      // 支座座板
+      const basePlateGeometry = new THREE.BoxGeometry(bearingWidth, bearingHeight, bearingLength);
+      const basePlateMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 });
+      
+      // 左侧支座
+      const leftBearing = new THREE.Mesh(basePlateGeometry, basePlateMaterial);
+      leftBearing.position.set(-2, 0, 0);
+      leftBearing.castShadow = true;
+      leftBearing.receiveShadow = true;
+      bearingGroup.add(leftBearing);
+      
+      // 右侧支座
+      const rightBearing = new THREE.Mesh(basePlateGeometry, basePlateMaterial);
+      rightBearing.position.set(2, 0, 0);
+      rightBearing.castShadow = true;
+      rightBearing.receiveShadow = true;
+      bearingGroup.add(rightBearing);
+      
+      // 老化剪切变形的支座（黄色高亮）
+      if (xPos === -70) { // 第一个主墩左侧支座
+        const damagedBearingMaterial = new THREE.MeshStandardMaterial({ 
+          color: 0xFFCC00,
+          emissive: 0xFFCC00,
+          emissiveIntensity: 0.3
+        });
+        leftBearing.material = damagedBearingMaterial;
+      }
+      
+      bearingGroup.position.set(xPos, yPos, 0);
+      bridgeGroup.add(bearingGroup);
+    }
+    
+    // 创建病害点
+    function createDefects(defectGroup) {
+      // 1. 主墩底部裂缝
+      createCrack(defectGroup, -60, -5, 0, 3, Math.PI / 2, '#FF0000', {
+        title: '主墩底部裂缝',
+        location: '左侧主墩底部',
+        type: '裂缝',
+        severity: '中等',
+        severityLevel: 'medium',
+        value: '最大宽度3.2mm',
+        discoveryDate: '2023-11-15',
+        lastUpdate: '2024-10-18',
+        details: [
+          { label: '裂缝长度', value: '2.8m' },
+          { label: '最大宽度', value: '3.2mm' },
+          { label: '裂缝方向', value: '横向' },
+          { label: '发展速率', value: '0.1mm/月' },
+          { label: '混凝土强度', value: '32.5MPa' }
+        ],
+        trendData: {
+          label: '裂缝宽度(mm)',
+          labels: ['2023-11', '2024-01', '2024-03', '2024-07', '2024-10'],
+          values: [1.2, 1.8, 2.5, 2.9, 3.2]
+        },
+        color: '#FF0000',
+        analysis: '该裂缝位于左侧主墩底部，呈横向分布，主要由混凝土收缩和应力集中引起。目前裂缝宽度已达3.2mm，超过规范允许值（0.2mm），但发展速率相对缓慢。',
+        suggestions: [
+          '定期监测裂缝宽度变化',
+          '对裂缝进行环氧砂浆封闭处理',
+          '在裂缝周围增设应力传感器',
+          '评估是否需要进行加固处理'
+        ]
+      });
+      
+      // 2. 箱梁底板裂缝
+      createCrack(defectGroup, 0, -2.5, 0, 4, 0, '#FF0000', {
+        title: '箱梁底板裂缝',
+        location: '跨中区域箱梁底板',
+        type: '裂缝',
+        severity: '轻微',
+        severityLevel: 'low',
+        value: '最大宽度1.5mm',
+        discoveryDate: '2024-02-20',
+        lastUpdate: '2024-10-18',
+        details: [
+          { label: '裂缝长度', value: '1.5m' },
+          { label: '最大宽度', value: '1.5mm' },
+          { label: '裂缝方向', value: '纵向' },
+          { label: '发展速率', value: '0.05mm/月' },
+          { label: '对应预应力束', value: 'N3束' }
+        ],
+        trendData: {
+          label: '裂缝宽度(mm)',
+          labels: ['2024-02', '2024-04', '2024-06', '2024-08', '2024-10'],
+          values: [0.8, 1.0, 1.2, 1.4, 1.5]
+        },
+        color: '#FF0000',
+        analysis: '该裂缝位于跨中区域箱梁底板，呈纵向分布，可能与预应力损失或混凝土收缩有关。目前裂缝宽度为1.5mm，处于可控范围内，发展较为稳定。',
+        suggestions: [
+          '继续监测裂缝发展情况',
+          '检查相应位置的预应力损失情况',
+          '考虑进行表面封闭处理',
+          '定期进行混凝土碳化深度检测'
+        ]
+      });
+      
+      // 3. 跨中位移变形（蓝色半透明网格）
+      createDeformation(defectGroup, 0, 15, 0, 20, '#00A2FF', {
+        title: '跨中位移变形',
+        location: '桥梁跨中区域',
+        type: '位移/变形',
+        severity: '轻微',
+        severityLevel: 'low',
+        value: '下挠18.5mm',
+        discoveryDate: '2024-01-10',
+        lastUpdate: '2024-10-18',
+        details: [
+          { label: '最大下挠值', value: '18.5mm' },
+          { label: '设计允许值', value: 'L/1000 = 260mm' },
+          { label: '弹性变形', value: '12.3mm' },
+          { label: '塑性变形', value: '6.2mm' },
+          { label: '发展速率', value: '0.5mm/月' }
+        ],
+        trendData: {
+          label: '跨中下挠(mm)',
+          labels: ['2024-01', '2024-03', '2024-05', '2024-07', '2024-09', '2024-10'],
+          values: [10.5, 12.8, 14.6, 16.2, 17.5, 18.5]
+        },
+        color: '#00A2FF',
+        analysis: '桥梁跨中区域存在轻微下挠变形，目前最大下挠值为18.5mm，远小于设计允许值（260mm）。变形主要由恒载和混凝土徐变引起，发展速率逐渐减缓。',
+        suggestions: [
+          '继续监测跨中位移变化',
+          '定期进行荷载试验',
+          '评估混凝土徐变发展趋势',
+          '优化车辆通行管理，限制超载车辆'
+        ]
+      });
+      
+      // 4. 支座病害（黄色高亮）
+      createBearingDefect(defectGroup, -60, 10, 0, '#FFCC00', {
+        title: '支座老化剪切变形',
+        location: '左侧主墩左侧支座',
+        type: '支座病害',
+        severity: '中等',
+        severityLevel: 'medium',
+        value: '剪切变形角15°',
+        discoveryDate: '2023-09-05',
+        lastUpdate: '2024-10-18',
+        details: [
+          { label: '剪切变形角', value: '15°' },
+          { label: '设计允许值', value: '20°' },
+          { label: '支座类型', value: '板式橡胶支座' },
+          { label: '使用年限', value: '12年' },
+          { label: '老化程度', value: '中度' }
+        ],
+        trendData: {
+          label: '剪切变形角(°)',
+          labels: ['2023-09', '2023-12', '2024-03', '2024-06', '2024-09', '2024-10'],
+          values: [8, 10, 12, 13.5, 14.5, 15]
+        },
+        color: '#FFCC00',
+        analysis: '左侧主墩左侧支座出现老化剪切变形，目前剪切变形角为15°，接近设计允许值（20°）。支座已使用12年，存在一定程度的老化现象，影响其正常工作性能。',
+        suggestions: [
+          '加强监测支座变形发展',
+          '在下次维修期更换该支座',
+          '检查其他支座是否存在类似问题',
+          '评估支座老化对结构安全的影响'
+        ]
+      });
+      
+      // 5. 桥面表面病害（灰色不规则区域）
+      createSpalling(defectGroup, 30, 20, 0, '#AAAAAA', {
+        title: '桥面网裂和剥落',
+        location: '右侧半幅桥面',
+        type: '表面病害',
+        severity: '轻微',
+        severityLevel: 'low',
+        value: '面积约8.5㎡',
+        discoveryDate: '2024-04-15',
+        lastUpdate: '2024-10-18',
+        details: [
+          { label: '病害面积', value: '8.5㎡' },
+          { label: '病害深度', value: '5-15mm' },
+          { label: '病害类型', value: '网裂+局部剥落' },
+          { label: '原因分析', value: '冻融循环+荷载作用' },
+          { label: '影响程度', value: '轻微' }
+        ],
+        trendData: {
+          label: '病害面积(㎡)',
+          labels: ['2024-04', '2024-05', '2024-06', '2024-07', '2024-08', '2024-09', '2024-10'],
+          values: [4.2, 5.1, 6.3, 7.0, 7.8, 8.2, 8.5]
+        },
+        color: '#AAAAAA',
+        analysis: '右侧半幅桥面存在网裂和局部剥落现象，主要由冻融循环和车辆荷载作用引起。目前病害面积约8.5㎡，深度5-15mm，对结构安全影响较小，但影响行车舒适度和耐久性。',
+        suggestions: [
+          '在下次日常养护中进行修补',
+          '加强桥面排水系统维护',
+          '定期清理桥面，减少污染物侵蚀',
+          '考虑在适当时机进行薄层罩面处理'
+        ]
+      });
+      
+      // 6. 护栏钢筋锈蚀（橙色斑点）
+      createRust(defectGroup, -30, 22, 3, '#FF6600', {
+        title: '护栏根部钢筋锈蚀',
+        location: '左侧护栏根部',
+        type: '钢筋锈蚀',
+        severity: '中等',
+        severityLevel: 'medium',
+        value: '锈蚀深度0.8mm',
+        discoveryDate: '2023-12-20',
+        lastUpdate: '2024-10-18',
+        details: [
+          { label: '锈蚀钢筋直径', value: '16mm' },
+          { label: '锈蚀深度', value: '0.8mm' },
+          { label: '锈蚀率', value: '5%' },
+          { label: '保护层厚度', value: '25mm' },
+          { label: '碳化深度', value: '28mm' }
+        ],
+        trendData: {
+          label: '锈蚀深度(mm)',
+          labels: ['2023-12', '2024-02', '2024-04', '2024-06', '2024-08', '2024-10'],
+          values: [0.3, 0.45, 0.55, 0.65, 0.75, 0.8]
+        },
+        color: '#FF6600',
+        analysis: '左侧护栏根部出现钢筋锈蚀现象，主要由混凝土保护层碳化和雨水渗透引起。混凝土碳化深度（28mm）已超过保护层厚度（25mm），导致钢筋失去碱性保护。',
+        suggestions: [
+          '对锈蚀部位进行局部修补',
+          '增加混凝土保护层厚度',
+          '涂刷混凝土保护剂',
+          '改善护栏根部排水条件',
+          '定期检测碳化深度发展'
+        ]
       });
     }
     
+    // 创建裂缝
+    function createCrack(defectGroup, x, y, z, length, rotation, color, userData) {
+      const crackGroup = new THREE.Group();
+      crackGroup.userData = userData;
+      
+      // 创建裂缝线段
+      const crackGeometry = new THREE.BoxGeometry(length, 0.02, 0.02);
+      const crackMaterial = new THREE.MeshBasicMaterial({ 
+        color: color,
+        transparent: true,
+        opacity: 0.8
+      });
+      
+      const crack = new THREE.Mesh(crackGeometry, crackMaterial);
+      crack.position.set(0, 0, 0);
+      crack.rotation.y = rotation;
+      crack.name = 'crack';
+      crackGroup.add(crack);
+      
+      // 添加发光效果
+      const glowGeometry = new THREE.BoxGeometry(length + 0.2, 0.04, 0.04);
+      const glowMaterial = new THREE.MeshBasicMaterial({ 
+        color: color,
+        transparent: true,
+        opacity: 0.4
+      });
+      
+      const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+      glow.position.set(0, 0, 0);
+      glow.rotation.y = rotation;
+      glow.name = 'crack-glow';
+      crackGroup.add(glow);
+      
+      crackGroup.position.set(x, y, z);
+      defectGroup.add(crackGroup);
+      
+      // 存储用于动画
+      if (!window.crackAnimations) window.crackAnimations = [];
+      window.crackAnimations.push({
+        crack: crack,
+        glow: glow,
+        baseOpacity: 0.8,
+        glowOpacity: 0.4
+      });
+    }
+    
+    // 创建位移变形效果
+    function createDeformation(defectGroup, x, y, z, size, color, userData) {
+      const deformationGroup = new THREE.Group();
+      deformationGroup.userData = userData;
+      
+      // 创建网格平面
+      const gridGeometry = new THREE.PlaneGeometry(size, size, 10, 10);
+      const gridMaterial = new THREE.MeshBasicMaterial({ 
+        color: color,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.DoubleSide,
+        wireframe: true
+      });
+      
+      const grid = new THREE.Mesh(gridGeometry, gridMaterial);
+      grid.rotation.x = Math.PI / 2;
+      grid.name = 'deformation';
+      deformationGroup.add(grid);
+      
+      // 添加边缘高亮
+      const edgeGeometry = new THREE.EdgesGeometry(gridGeometry);
+      const edgeMaterial = new THREE.LineBasicMaterial({ 
+        color: color,
+        transparent: true,
+        opacity: 0.6,
+        linewidth: 2
+      });
+      
+      const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+      edges.rotation.x = Math.PI / 2;
+      edges.name = 'deformation-edge';
+      deformationGroup.add(edges);
+      
+      deformationGroup.position.set(x, y, z);
+      defectGroup.add(deformationGroup);
+    }
+    
+    // 创建支座病害
+    function createBearingDefect(defectGroup, x, y, z, color, userData) {
+      const bearingGroup = new THREE.Group();
+      bearingGroup.userData = userData;
+      
+      // 创建高亮效果
+      const highlightGeometry = new THREE.BoxGeometry(2, 0.8, 4);
+      const highlightMaterial = new THREE.MeshBasicMaterial({ 
+        color: color,
+        transparent: true,
+        opacity: 0.4
+      });
+      
+      const highlight = new THREE.Mesh(highlightGeometry, highlightMaterial);
+      highlight.name = 'bearing';
+      bearingGroup.add(highlight);
+      
+      // 添加脉动效果
+      const pulseGeometry = new THREE.BoxGeometry(2.2, 1, 4.2);
+      const pulseMaterial = new THREE.MeshBasicMaterial({ 
+        color: color,
+        transparent: true,
+        opacity: 0.2
+      });
+      
+      const pulse = new THREE.Mesh(pulseGeometry, pulseMaterial);
+      pulse.name = 'bearing-pulse';
+      bearingGroup.add(pulse);
+      
+      bearingGroup.position.set(x, y, z);
+      defectGroup.add(bearingGroup);
+      
+      // 存储用于动画
+      if (!window.bearingAnimations) window.bearingAnimations = [];
+      window.bearingAnimations.push({
+        pulse: pulse,
+        baseOpacity: 0.2,
+        scale: 1
+      });
+    }
+    
+    // 创建表面病害（网裂和剥落）
+    function createSpalling(defectGroup, x, y, z, color, userData) {
+      const spallingGroup = new THREE.Group();
+      spallingGroup.userData = userData;
+      
+      // 创建不规则形状的表面病害
+      const spallingGeometry = new THREE.ShapeGeometry(createIrregularShape(4, 3));
+      const spallingMaterial = new THREE.MeshBasicMaterial({ 
+        color: color,
+        transparent: true,
+        opacity: 0.6,
+        side: THREE.DoubleSide
+      });
+      
+      const spalling = new THREE.Mesh(spallingGeometry, spallingMaterial);
+      spalling.rotation.x = Math.PI / 2;
+      spalling.name = 'spalling';
+      spallingGroup.add(spalling);
+      
+      spallingGroup.position.set(x, y, z);
+      defectGroup.add(spallingGroup);
+    }
+    
+    // 创建钢筋锈蚀（橙色斑点）
+    function createRust(defectGroup, x, y, z, color, userData) {
+      const rustGroup = new THREE.Group();
+      rustGroup.userData = userData;
+      
+      // 创建多个锈蚀斑点
+      const rustSize = 0.3;
+      const rustPositions = [
+        [0, 0, 0], [0.5, -0.2, 0], [-0.3, 0.4, 0],
+        [0.2, 0.3, 0], [-0.4, -0.3, 0], [0.6, 0.2, 0]
+      ];
+      
+      const rustGeometry = new THREE.CircleGeometry(rustSize, 8);
+      const rustMaterial = new THREE.MeshBasicMaterial({ 
+        color: color,
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide
+      });
+      
+      rustPositions.forEach(pos => {
+        const rust = new THREE.Mesh(rustGeometry, rustMaterial);
+        rust.position.set(pos[0], pos[1], pos[2]);
+        rust.rotation.y = Math.random() * Math.PI;
+        rust.name = 'rust';
+        rustGroup.add(rust);
+      });
+      
+      rustGroup.position.set(x, y, z);
+      defectGroup.add(rustGroup);
+    }
+    
+    // 创建不规则形状
+    function createIrregularShape(width, height) {
+      const shape = new THREE.Shape();
+      
+      shape.moveTo(0, 0);
+      shape.lineTo(width * 0.8, height * 0.2);
+      shape.lineTo(width, height * 0.5);
+      shape.lineTo(width * 0.7, height * 0.8);
+      shape.lineTo(width * 0.3, height);
+      shape.lineTo(0, height * 0.7);
+      shape.lineTo(width * 0.2, height * 0.3);
+      shape.lineTo(0, 0);
+      
+      return shape;
+    }
+    
+    // 创建箱梁断面辅助线
+    function createSectionHelper() {
+      const helperGroup = new THREE.Group();
+      
+      // 创建垂直切面线
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, -10, -10),
+        new THREE.Vector3(0, 30, 10)
+      ]);
+      const lineMaterial = new THREE.LineBasicMaterial({ 
+        color: 0x06B6D4,
+        transparent: true,
+        opacity: 0.7,
+        linewidth: 2
+      });
+      
+      const sectionLine = new THREE.Line(lineGeometry, lineMaterial);
+      helperGroup.add(sectionLine);
+      
+      // 添加标签
+      const spriteMaterial = new THREE.SpriteMaterial({
+        map: createTextTexture('箱梁断面', 12, '#06B6D4')
+      });
+      
+      const sprite = new THREE.Sprite(spriteMaterial);
+      sprite.position.set(2, 25, 0);
+      sprite.scale.set(2, 1, 1);
+      helperGroup.add(sprite);
+      
+      return helperGroup;
+    }
+    
+    // 创建文本纹理
+    function createTextTexture(text, size, color) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.font = `${size}px Arial`;
+      
+      // 测量文本宽度
+      const metrics = ctx.measureText(text);
+      canvas.width = metrics.width + 10;
+      canvas.height = size + 10;
+      
+      ctx.font = `${size}px Arial`;
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      return texture;
+    }
+    
+    // 更新裂缝动画
+    function updateCrackAnimation() {
+      if (!window.crackAnimations) return;
+      
+      const time = Date.now() * 0.001;
+      
+      window.crackAnimations.forEach(anim => {
+        const factor = 0.5 + 0.5 * Math.sin(time * 2);
+        anim.crack.material.opacity = anim.baseOpacity * factor;
+        anim.glow.material.opacity = anim.glowOpacity * factor;
+      });
+      
+      // 更新支座脉动动画
+      if (window.bearingAnimations) {
+        window.bearingAnimations.forEach(anim => {
+          const factor = 0.5 + 0.5 * Math.sin(time * 1.5);
+          anim.pulse.material.opacity = anim.baseOpacity * factor;
+          const scale = 1 + factor * 0.1;
+          anim.pulse.scale.set(scale, scale, scale);
+        });
+      }
+    }
+    
     // 页面加载完成后初始化
-    document.addEventListener('DOMContentLoaded', () => {
-      initCharts();
+    window.addEventListener('DOMContentLoaded', () => {
       initThreeJsScene();
     });
   </script>
