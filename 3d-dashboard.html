@@ -789,13 +789,6 @@
       const bridgeGroup = new THREE.Group();
       scene.add(bridgeGroup);
       
-      // 创建山组
-      const mountainsGroup = new THREE.Group();
-      scene.add(mountainsGroup);
-      
-      // 在桥梁两端创建山
-      createMountains(mountainsGroup, -130, 130); // 基于桥梁总长260米
-      
       // 创建混凝土材质（素模灰白色）
       const concreteMaterial = new THREE.MeshStandardMaterial({
         color: 0xE0E0E0,
@@ -1276,115 +1269,6 @@
       
       // 创建主梁（轻量化设计）
       createMainBeam(bridgeGroup, concreteMaterial, totalLength, deckWidth, beamHeight, beamHeight, sideSpan, mainSpan, sideSpan);
-    }
-    
-    // 创建山体函数
-    function createMountains(mountainsGroup, leftBridgeEnd, rightBridgeEnd) {
-      // 左侧山体
-      createSingleMountain(mountainsGroup, leftBridgeEnd - 150, 0, -50, 100, 200, 120, 0x5C6F48);
-      createSingleMountain(mountainsGroup, leftBridgeEnd - 100, -80, -40, 80, 150, 100, 0x6A7E55);
-      createSingleMountain(mountainsGroup, leftBridgeEnd - 120, 80, -30, 70, 180, 90, 0x73895A);
-      
-      // 右侧山体
-      createSingleMountain(mountainsGroup, rightBridgeEnd + 150, 0, -50, 100, 200, 120, 0x5C6F48);
-      createSingleMountain(mountainsGroup, rightBridgeEnd + 100, -80, -40, 80, 150, 100, 0x6A7E55);
-      createSingleMountain(mountainsGroup, rightBridgeEnd + 120, 80, -30, 70, 180, 90, 0x73895A);
-    }
-    
-    // 创建单个山体
-    function createSingleMountain(parentGroup, x, z, yMin, height, width, depth, color) {
-      // 使用Perlin噪声创建不规则的山体形状
-      const mountainGeometry = new THREE.BoxGeometry(width, height, depth, 32, 32, 32);
-      
-      // 生成不规则的山体顶点
-      const positions = mountainGeometry.attributes.position.array;
-      for (let i = 0; i < positions.length; i += 3) {
-        // 仅修改Y轴（高度），保持X和Z相对不变
-        if (positions[i + 1] > yMin) {
-          // 添加一些随机性使山体更自然
-          const randomFactor = (Math.sin(positions[i] * 0.02) * Math.cos(positions[i + 2] * 0.02) * 0.5 + 0.5) * 0.3;
-          positions[i + 1] = positions[i + 1] * (1 + randomFactor);
-        }
-      }
-      mountainGeometry.attributes.position.needsUpdate = true;
-      mountainGeometry.computeVertexNormals();
-      
-      // 创建材质
-      const mountainMaterial = new THREE.MeshStandardMaterial({
-        color: color,
-        roughness: 0.7,
-        metalness: 0.1
-      });
-      
-      const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
-      mountain.position.set(x, yMin + height / 2, z);
-      mountain.receiveShadow = true;
-      mountain.castShadow = true;
-      
-      // 添加一些树木点缀
-      addTreesToMountain(mountain, color);
-      
-      parentGroup.add(mountain);
-    }
-    
-    // 给山体添加树木
-    function addTreesToMountain(mountain, baseColor) {
-      const treeGroup = new THREE.Group();
-      mountain.add(treeGroup);
-      
-      // 创建一些随机树木
-      const treeCount = Math.floor(Math.random() * 20) + 10;
-      
-      for (let i = 0; i < treeCount; i++) {
-        // 在山体表面随机位置
-        const treeX = (Math.random() - 0.5) * mountain.geometry.parameters.width * 0.8;
-        const treeZ = (Math.random() - 0.5) * mountain.geometry.parameters.depth * 0.8;
-        
-        // 估算该位置的山体高度
-        const height = getMountainHeightAt(mountain, treeX, treeZ);
-        if (height > 0) {
-          // 创建树干
-          const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2);
-          const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x5D4037 });
-          const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-          
-          // 创建树冠
-          const crownGeometry = new THREE.ConeGeometry(2, 3, 8);
-          const leafColor = baseColor.replace('0x', '0x') * 0.8 + 0x222211;
-          const crownMaterial = new THREE.MeshStandardMaterial({ color: leafColor });
-          const crown = new THREE.Mesh(crownGeometry, crownMaterial);
-          
-          // 组装树木
-          trunk.position.set(treeX, height + 1, treeZ);
-          crown.position.set(treeX, height + 3, treeZ);
-          
-          treeGroup.add(trunk);
-          treeGroup.add(crown);
-        }
-      }
-    }
-    
-    // 获取山体指定位置的高度（简化计算）
-    function getMountainHeightAt(mountain, x, z) {
-      // 这是一个简化的高度估算，基于Perlin噪声原理
-      const width = mountain.geometry.parameters.width;
-      const depth = mountain.geometry.parameters.depth;
-      const maxHeight = mountain.geometry.parameters.height;
-      
-      // 计算相对于山体中心的位置
-      const relX = x / (width / 2);
-      const relZ = z / (depth / 2);
-      
-      // 计算到中心的距离
-      const distance = Math.sqrt(relX * relX + relZ * relZ);
-      
-      // 基于距离和一些噪声生成高度
-      if (distance < 0.8) { // 只在山体范围内
-        const noise = Math.sin(x * 0.02) * Math.cos(z * 0.02);
-        return (1 - distance * 1.25) * maxHeight * 0.6 + noise * maxHeight * 0.1;
-      }
-      return 0;
-    }
       
       // 创建主缆和吊索
       createCablesAndHangers(bridgeGroup, steelMaterial, totalLength, mainSpan, deckWidth, towerHeight);
