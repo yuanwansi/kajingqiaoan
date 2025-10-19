@@ -17,15 +17,19 @@
       theme: {
         extend: {
           colors: {
-            primary: '#0D1B2A',
-            secondary: '#2C3E50',
-            success: '#4CAF50',
-            warning: '#FF9800',
-            danger: '#F44336',
-            info: '#64B5F6',
+            primary: '#0F172A',
+            secondary: '#1E293B',
+            success: '#10B981',
+            warning: '#FACC15',
+            danger: '#EF4444',
+            info: '#3B82F6',
+            teal: {
+              400: '#06B6D4',
+              500: '#0EA5E9'
+            }
           },
           fontFamily: {
-            sans: ['"Noto Sans SC"', '"Source Han Sans SC"', 'sans-serif'],
+            sans: ['Inter', '"Noto Sans SC"', '"Source Han Sans SC"', 'sans-serif'],
           },
         },
       }
@@ -47,7 +51,7 @@
         box-shadow: 0 4px 20px rgba(0,0,0,0.08);
       }
       .input-focus {
-        box-shadow: 0 0 0 3px rgba(100, 181, 246, 0.3);
+        box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.3);
       }
       .animate-fade-in {
         animation: fadeIn 0.5s ease-in;
@@ -57,6 +61,48 @@
       }
       .animate-scale {
         animation: scale 0.5s ease;
+      }
+      .glass-effect {
+        background: rgba(15, 23, 42, 0.7);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+      }
+      .glass-effect-light {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+      }
+      .neon-border {
+        position: relative;
+        border: 1px solid rgba(6, 182, 212, 0.2);
+      }
+      .neon-border::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border: 1px solid rgba(6, 182, 212, 0.5);
+        pointer-events: none;
+        opacity: 0.5;
+        box-shadow: 0 0 8px rgba(6, 182, 212, 0.2);
+      }
+      .grid-pattern {
+        background-image: 
+            linear-gradient(rgba(6, 182, 212, 0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(6, 182, 212, 0.05) 1px, transparent 1px);
+        background-size: 20px 20px;
+      }
+      .card-hover-effect {
+        transition: all 0.3s ease;
+      }
+      .card-hover-effect:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+      }
+      .glow-teal {
+        filter: drop-shadow(0 0 4px rgba(6, 182, 212, 0.6));
       }
     }
     
@@ -87,54 +133,57 @@
 
   </style>
 </head>
-<body class="bg-gray-100 font-sans text-gray-800 min-h-screen flex flex-col no-scrollbar">
+<body class="bg-gray-900 font-sans text-white min-h-screen flex flex-col no-scrollbar relative">
+  <!-- 背景网格 -->
+  <div class="fixed inset-0 grid-pattern pointer-events-none z-0"></div>
+  
   <!-- 页面容器 -->
-  <div class="flex-1 flex flex-col max-w-md mx-auto w-full">
+  <div class="flex-1 flex flex-col max-w-md mx-auto w-full relative z-10">
     <!-- 首页 - 查询页面 -->
     <div id="home-page" class="flex-1 flex flex-col p-6">
       <!-- 顶部导航栏 -->
       <div class="flex justify-end mt-4 mb-4">
-        <button id="logout-button" class="p-2 rounded-full bg-white card-shadow transition-all-300 hover:shadow-md">
-          <i class="fa fa-sign-out text-primary"></i>
+        <button id="logout-button" class="p-2 rounded-full glass-effect-light border border-teal-400/30 card-shadow transition-all-300 hover:shadow-md">
+          <i class="fa fa-sign-out text-teal-400"></i>
         </button>
       </div>
       <!-- 顶部标题 -->
       <div class="text-center mb-12">
-        <div class="inline-block p-4 rounded-full bg-primary/10 mb-4">
-          <i class="fa fa-bridge text-4xl text-primary"></i>
+        <div class="inline-block p-4 rounded-full bg-teal-400/10 mb-4">
+          <i class="fa fa-bridge text-4xl text-teal-400 glow-teal"></i>
         </div>
-        <h1 class="text-2xl font-bold text-primary mb-2">喀境桥安</h1>
-        <p class="text-gray-500">桥梁安全一键查询</p>
+        <h1 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500 mb-2">喀境桥安</h1>
+        <p class="text-gray-400">桥梁安全一键查询</p>
       </div>
       
       <!-- 搜索框区域 -->
       <div class="mb-8 animate-slide-up">
         <div class="relative">
           <input type="text" id="bridge-search" placeholder="请输入桥梁名称" 
-                 class="w-full py-4 px-5 bg-white border border-gray-200 rounded-xl text-lg focus:outline-none focus:input-focus transition-all-300 card-shadow">
-          <div class="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400">
+                 class="w-full py-4 px-5 glass-effect border border-teal-400/30 rounded-xl text-lg focus:outline-none focus:input-focus transition-all-300 card-shadow text-white">
+          <div class="absolute right-4 top-1/2 transform -translate-y-1/2 text-teal-400/70">
             <i class="fa fa-search text-xl"></i>
           </div>
         </div>
-        <p class="text-center text-gray-500 text-sm mt-3">
-          或 <span class="text-primary font-medium cursor-pointer" id="scan-qrcode">扫描桥头二维码</span>
+        <p class="text-center text-gray-400 text-sm mt-3">
+          或 <span class="text-teal-400 font-medium cursor-pointer" id="scan-qrcode">扫描桥头二维码</span>
         </p>
       </div>
       
       <!-- 常用查询 -->
       <div class="mt-auto animate-slide-up" style="animation-delay: 0.2s">
-        <h2 class="text-gray-500 text-sm mb-3">常用查询</h2>
+        <h2 class="text-gray-400 text-sm mb-3">常用查询</h2>
         <div class="flex flex-wrap gap-2">
-          <button class="bg-white px-4 py-2 rounded-lg text-sm card-shadow transition-all-300 hover:shadow-md" onclick="document.getElementById('bridge-search').value='花溪大桥'; simulateSearch('花溪大桥')">
+          <button class="glass-effect px-4 py-2 rounded-lg text-sm border border-teal-400/30 card-shadow transition-all-300 hover:shadow-md hover:bg-teal-400/10" onclick="document.getElementById('bridge-search').value='花溪大桥'; simulateSearch('花溪大桥')">
             花溪大桥
           </button>
-          <button class="bg-white px-4 py-2 rounded-lg text-sm card-shadow transition-all-300 hover:shadow-md" onclick="document.getElementById('bridge-search').value='南明河大桥'; simulateSearch('南明河大桥')">
+          <button class="glass-effect px-4 py-2 rounded-lg text-sm border border-teal-400/30 card-shadow transition-all-300 hover:shadow-md hover:bg-teal-400/10" onclick="document.getElementById('bridge-search').value='南明河大桥'; simulateSearch('南明河大桥')">
             南明河大桥
           </button>
-          <button class="bg-white px-4 py-2 rounded-lg text-sm card-shadow transition-all-300 hover:shadow-md" onclick="document.getElementById('bridge-search').value='观山湖大桥'; simulateSearch('观山湖大桥')">
+          <button class="glass-effect px-4 py-2 rounded-lg text-sm border border-teal-400/30 card-shadow transition-all-300 hover:shadow-md hover:bg-teal-400/10" onclick="document.getElementById('bridge-search').value='观山湖大桥'; simulateSearch('观山湖大桥')">
             观山湖大桥
           </button>
-          <button class="bg-white px-4 py-2 rounded-lg text-sm card-shadow transition-all-300 hover:shadow-md" onclick="document.getElementById('bridge-search').value='贵黄高速2号桥'; simulateSearch('贵黄高速2号桥')">
+          <button class="glass-effect px-4 py-2 rounded-lg text-sm border border-teal-400/30 card-shadow transition-all-300 hover:shadow-md hover:bg-teal-400/10" onclick="document.getElementById('bridge-search').value='贵黄高速2号桥'; simulateSearch('贵黄高速2号桥')">
             贵黄高速2号桥
           </button>
         </div>
@@ -151,31 +200,31 @@
       </div>
       
       <!-- 桥梁名称 -->
-      <h2 id="result-bridge-name" class="text-xl font-bold text-center mb-8 animate-slide-up">花溪大桥</h2>
+      <h2 id="result-bridge-name" class="text-xl font-bold text-center mb-8 animate-slide-up text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500">花溪大桥</h2>
       
       <!-- 安全评分区域 -->
       <div class="mb-10 animate-scale">
-        <div class="bg-white rounded-2xl p-6 text-center card-shadow">
+        <div class="glass-effect border border-teal-400/30 rounded-2xl p-6 text-center card-shadow card-hover-effect">
           <div id="safety-score-container" class="inline-block relative">
-            <div class="text-6xl font-bold text-success" id="safety-score">85</div>
+            <div class="text-6xl font-bold text-teal-400 glow-teal" id="safety-score">85</div>
             <div class="text-xl font-medium text-gray-400 absolute -top-2 -right-10">/100</div>
           </div>
-          <div class="mt-2 text-xl font-semibold text-success" id="safety-level">良好</div>
+          <div class="mt-2 text-xl font-semibold text-teal-400" id="safety-level">良好</div>
         </div>
       </div>
       
       <!-- 交通信号灯式指示器 -->
       <div class="flex justify-center mb-8 animate-slide-up" style="animation-delay: 0.2s">
-        <div id="status-indicator" class="w-24 h-24 rounded-full bg-success flex items-center justify-center card-shadow">
+        <div id="status-indicator" class="w-24 h-24 rounded-full bg-teal-400 flex items-center justify-center card-shadow glow-teal">
           <i class="fa fa-smile-o text-white text-5xl"></i>
         </div>
       </div>
       
       <!-- AI提示信息 -->
       <div class="mb-8 animate-slide-up" style="animation-delay: 0.3s">
-        <div class="bg-white rounded-2xl p-6 card-shadow">
-          <h3 class="text-gray-500 text-sm mb-3">AI安全提示</h3>
-          <p id="ai-message" class="text-gray-800 leading-relaxed">
+        <div class="glass-effect border border-teal-400/30 rounded-2xl p-6 card-shadow card-hover-effect">
+          <h3 class="text-teal-400 text-sm mb-3">AI安全提示</h3>
+          <p id="ai-message" class="text-gray-300 leading-relaxed">
             当前桥梁结构稳定，可安全通行。
           </p>
         </div>
@@ -183,9 +232,9 @@
       
       <!-- 历史健康度曲线 -->
       <div class="flex-1 animate-slide-up" style="animation-delay: 0.4s">
-        <div class="bg-white rounded-2xl p-6 card-shadow h-full">
+        <div class="glass-effect border border-teal-400/30 rounded-2xl p-6 card-shadow card-hover-effect h-full">
           <div class="flex justify-between items-center mb-6">
-            <h3 class="text-gray-500 text-sm">历史健康度趋势</h3>
+            <h3 class="text-teal-400 text-sm">历史健康度趋势</h3>
             <div class="text-xs text-gray-400">近30天</div>
           </div>
           <div class="h-48">
@@ -202,8 +251,8 @@
       '花溪大桥': {
         score: 85,
         level: '良好',
-        levelColor: 'text-success',
-        indicatorColor: 'bg-success',
+        levelColor: 'text-teal-400',
+        indicatorColor: 'bg-teal-400 glow-teal',
         indicatorIcon: 'fa-smile-o',
         message: '当前桥梁结构稳定，可安全通行。'
       },
@@ -218,8 +267,8 @@
       '观山湖大桥': {
         score: 92,
         level: '优秀',
-        levelColor: 'text-success',
-        indicatorColor: 'bg-success',
+        levelColor: 'text-teal-400',
+        indicatorColor: 'bg-teal-400 glow-teal',
         indicatorIcon: 'fa-smile-o',
         message: '桥梁状态优异，可放心通行。'
       },
@@ -293,18 +342,24 @@
           datasets: [{
             label: '健康度',
             data: data,
-            borderColor: '#0D1B2A',
-            backgroundColor: 'rgba(13, 27, 42, 0.1)',
+            borderColor: '#06B6D4',
+            backgroundColor: 'rgba(6, 182, 212, 0.1)',
             tension: 0.4,
             fill: true,
-            pointBackgroundColor: currentScore < 60 ? '#F44336' : currentScore < 80 ? '#FF9800' : '#4CAF50',
+            pointBackgroundColor: currentScore < 60 ? '#EF4444' : currentScore < 80 ? '#FACC15' : '#06B6D4',
             pointRadius: 5,
-            pointHoverRadius: 7
+            pointHoverRadius: 7,
+            pointBorderColor: '#0F172A',
+            pointBorderWidth: 2
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
           plugins: {
             legend: {
               display: false
@@ -312,7 +367,17 @@
             tooltip: {
               mode: 'index',
               intersect: false,
+              backgroundColor: 'rgba(15, 23, 42, 0.8)',
+              titleColor: '#06B6D4',
+              bodyColor: '#FFFFFF',
+              borderColor: '#06B6D4',
+              borderWidth: 1,
+              padding: 12,
+              displayColors: false,
               callbacks: {
+                title: function(context) {
+                  return `日期: ${context[0].label}`;
+                },
                 label: function(context) {
                   return `健康度: ${context.parsed.y.toFixed(1)}`;
                 }
@@ -326,8 +391,10 @@
               },
               ticks: {
                 font: {
-                  size: 10
-                }
+                  size: 10,
+                  family: 'Inter'
+                },
+                color: '#94A3B8'
               }
             },
             y: {
@@ -336,13 +403,24 @@
               ticks: {
                 stepSize: 20,
                 font: {
-                  size: 10
-                }
+                  size: 10,
+                  family: 'Inter'
+                },
+                color: '#94A3B8'
               },
               grid: {
-                color: 'rgba(0, 0, 0, 0.05)'
+                color: 'rgba(148, 163, 184, 0.1)'
               }
             }
+          },
+          elements: {
+            line: {
+              borderWidth: 3
+            }
+          },
+          animation: {
+            duration: 1000,
+            easing: 'easeOutQuart'
           }
         }
       });

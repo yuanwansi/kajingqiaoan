@@ -13,6 +13,8 @@
   <!-- 引入Three.js -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+  <!-- Inter字体 -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
   <!-- Tailwind配置 -->
   <script>
@@ -20,17 +22,23 @@
       theme: {
         extend: {
           colors: {
-            primary: '#0D1B2A',
-            secondary: '#2C3E50',
-            success: '#4CAF50',
-            warning: '#FF9800',
-            danger: '#F44336',
-            info: '#64B5F6',
+            primary: '#0F172A', // 深蓝黑色作为主色调
+            secondary: '#1E293B', // 次要背景色
+            accent: '#06B6D4', // 科技感青色作为强调色
+            success: '#10B981',
+            warning: '#F59E0B',
+            danger: '#EF4444',
+            info: '#3B82F6',
             dark: '#121212',
           },
           fontFamily: {
+            inter: ['Inter', 'system-ui', 'sans-serif'],
             sans: ['"Noto Sans SC"', '"Source Han Sans SC"', 'sans-serif'],
           },
+          boxShadow: {
+            'neon': '0 0 5px rgba(6, 182, 212, 0.5), 0 0 10px rgba(6, 182, 212, 0.3)',
+            'card': '0 4px 20px rgba(0, 0, 0, 0.3)',
+          }
         },
       }
     }
@@ -54,33 +62,70 @@
         transform: translateY(-2px);
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
       }
+      .glass-effect {
+        background: rgba(15, 23, 42, 0.7);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+      }
+      .neon-border {
+        position: relative;
+        border: 1px solid rgba(6, 182, 212, 0.2);
+      }
+      .neon-border::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border: 1px solid rgba(6, 182, 212, 0.5);
+        pointer-events: none;
+        opacity: 0.5;
+        box-shadow: 0 0 8px rgba(6, 182, 212, 0.2);
+      }
+      .grid-pattern {
+        background-image: 
+            linear-gradient(rgba(6, 182, 212, 0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(6, 182, 212, 0.05) 1px, transparent 1px);
+        background-size: 20px 20px;
+      }
+      .card-hover-effect {
+        transition: all 0.3s ease;
+      }
+      .card-hover-effect:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+      }
     }
   </style>
 </head>
-<body class="bg-gray-100 font-sans text-gray-800 min-h-screen flex flex-col">
+<body class="bg-gray-100 font-sans text-gray-800 min-h-screen flex flex-col relative">
+  <!-- 背景网格 -->
+  <div class="fixed inset-0 grid-pattern pointer-events-none z-0"></div>
+  
   <!-- 顶部导航栏 -->
-  <header class="bg-white shadow-sm z-10">
+  <header class="glass-effect shadow-lg z-10 border-b border-gray-800/30">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between h-16">
         <!-- 左侧Logo和标题 -->
         <div class="flex items-center">
           <div class="flex-shrink-0 flex items-center">
-            <i class="fa fa-bridge text-primary text-2xl mr-2"></i>
-            <span class="font-bold text-xl text-primary">喀境桥安</span>
+            <i class="fa fa-bridge text-teal-400 text-2xl mr-2 glow-teal"></i>
+            <span class="font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500">喀境桥安</span>
           </div>
         </div>
         
         <!-- 中间桥梁选择器 -->
         <div class="flex items-center flex-1 justify-center">
           <div class="relative max-w-md w-full">
-            <select id="bridge-selector" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary sm:text-sm bg-white">
+            <select id="bridge-selector" class="block w-full pl-10 pr-3 py-2 border border-teal-400/30 rounded-md focus:outline-none focus:ring-teal-400 focus:border-teal-400 sm:text-sm bg-gray-800/50 text-white">
               <option value="bridge1">贵黄高速2号桥</option>
               <option value="bridge2">花溪大桥</option>
               <option value="bridge3">南明河大桥</option>
               <option value="bridge4">观山湖大桥</option>
             </select>
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <i class="fa fa-building-o text-gray-400"></i>
+              <i class="fa fa-building-o text-teal-400/70"></i>
             </div>
           </div>
         </div>
@@ -89,11 +134,11 @@
         <div class="flex items-center">
           <div class="ml-3 relative">
             <div class="flex items-center">
-              <span class="mr-2 font-medium">贵州桥梁养护工程有限公司</span>
-              <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center mr-2">
-                <span class="text-gray-600 text-sm">贵养</span>
+              <span class="mr-2 font-medium text-gray-200">贵州桥梁养护工程有限公司</span>
+              <div class="h-8 w-8 rounded-full bg-gradient-to-r from-teal-400 to-blue-500 flex items-center justify-center mr-2 shadow-lg shadow-teal-400/20">
+                <span class="text-gray-900 text-sm font-medium">贵养</span>
               </div>
-              <button id="logout-button" class="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-600" title="退出登录">
+              <button id="logout-button" class="p-2 hover:bg-gray-700/50 rounded-full transition-colors text-gray-300" title="退出登录">
                 <i class="fa fa-sign-out"></i>
               </button>
             </div>
@@ -104,42 +149,68 @@
   </header>
 
   <!-- 主要内容区域 -->
-  <div class="flex flex-1 overflow-hidden">
+  <div class="flex flex-1 overflow-hidden relative">
     <!-- 左侧菜单 -->
-    <aside class="w-64 bg-secondary text-white flex-shrink-0">
+    <aside class="w-64 glass-effect border-r border-gray-800/30 flex-shrink-0">
       <nav class="flex-1 p-4 space-y-1">
-        <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-md bg-primary/50 border-l-4 border-success">
-          <i class="fa fa-tachometer mr-3"></i>
+        <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-md bg-teal-400/10 border-l-4 border-teal-400 text-teal-300">
+          <div class="w-6 h-6 flex items-center justify-center mr-3">
+            <i class="fa fa-tachometer"></i>
+          </div>
           实时监测
         </a>
-        <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-md text-gray-200 hover:bg-primary/30 transition-bg">
-          <i class="fa fa-history mr-3"></i>
+        <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-md text-gray-300 hover:bg-teal-400/10 transition-all neon-border hover:border-teal-400/30">
+          <div class="w-6 h-6 flex items-center justify-center mr-3">
+            <i class="fa fa-history"></i>
+          </div>
           历史数据
         </a>
-        <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-md text-gray-200 hover:bg-primary/30 transition-bg">
-          <i class="fa fa-file-text-o mr-3"></i>
+        <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-md text-gray-300 hover:bg-teal-400/10 transition-all neon-border hover:border-teal-400/30">
+          <div class="w-6 h-6 flex items-center justify-center mr-3">
+            <i class="fa fa-file-text-o"></i>
+          </div>
           病害档案
         </a>
-        <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-md text-gray-200 hover:bg-primary/30 transition-bg">
-          <i class="fa fa-bar-chart mr-3"></i>
+        <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-md text-gray-300 hover:bg-teal-400/10 transition-all neon-border hover:border-teal-400/30">
+          <div class="w-6 h-6 flex items-center justify-center mr-3">
+            <i class="fa fa-bar-chart"></i>
+          </div>
           报告中心
         </a>
-        <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-md text-gray-200 hover:bg-primary/30 transition-bg">
-          <i class="fa fa-cog mr-3"></i>
+        <a href="alert-management.html" class="flex items-center px-4 py-3 text-sm font-medium rounded-md text-gray-300 hover:bg-teal-400/10 transition-all neon-border hover:border-teal-400/30">
+            <div class="w-6 h-6 flex items-center justify-center mr-3">
+              <i class="fa fa-bell"></i>
+            </div>
+            预警管理中心
+          </a>
+          <a href="3d-dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium rounded-md text-gray-300 hover:bg-teal-400/10 transition-all neon-border hover:border-teal-400/30">
+            <div class="w-6 h-6 flex items-center justify-center mr-3">
+              <i class="fa fa-cube"></i>
+            </div>
+            3D数字孪生
+          </a>
+        <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-md text-gray-300 hover:bg-teal-400/10 transition-all neon-border hover:border-teal-400/30">
+          <div class="w-6 h-6 flex items-center justify-center mr-3">
+            <i class="fa fa-cog"></i>
+          </div>
           系统设置
         </a>
         
-        <div class="mt-8 pt-4 border-t border-gray-700">
+        <div class="mt-8 pt-4 border-t border-gray-700/50">
           <h3 class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
             快速操作
           </h3>
           <div class="mt-3 space-y-1">
-            <a href="#" class="flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-200 hover:bg-primary/30 transition-bg">
-              <i class="fa fa-plus-circle mr-3"></i>
+            <a href="#" class="flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-300 hover:bg-teal-400/10 transition-all">
+              <div class="w-6 h-6 flex items-center justify-center mr-3">
+                <i class="fa fa-plus-circle"></i>
+              </div>
               新建监测点
             </a>
-            <a href="#" class="flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-200 hover:bg-primary/30 transition-bg">
-              <i class="fa fa-camera mr-3"></i>
+            <a href="#" class="flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-300 hover:bg-teal-400/10 transition-all">
+              <div class="w-6 h-6 flex items-center justify-center mr-3">
+                <i class="fa fa-camera"></i>
+              </div>
               查看监控视频
             </a>
           </div>
@@ -148,81 +219,84 @@
     </aside>
 
     <!-- 主要内容 -->
-    <main class="flex-1 overflow-y-auto bg-gray-100 p-6">
+    <main class="flex-1 overflow-y-auto bg-gray-900/90 p-6 relative">
+      <!-- 网格背景 -->
+      <div class="absolute inset-0 grid-pattern pointer-events-none opacity-30"></div>
+      
       <!-- 桥梁基本信息卡片 -->
       <div class="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div class="bg-white rounded-lg shadow-sm p-4 card-hover">
+        <div class="glass-effect rounded-lg p-4 card-hover-effect neon-border">
           <div class="flex items-center justify-between">
-            <h3 class="text-sm font-medium text-gray-500">安全评分</h3>
-            <span class="text-xs bg-danger/10 text-danger px-2 py-1 rounded-full">危险</span>
+            <h3 class="text-sm font-medium text-gray-400">安全评分</h3>
+            <span class="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full">危险</span>
           </div>
           <div class="mt-2">
-            <span class="text-3xl font-bold text-danger">45</span>
-            <span class="text-gray-400 ml-1">/100</span>
+            <span class="text-3xl font-bold text-red-400">45</span>
+            <span class="text-gray-500 ml-1">/100</span>
           </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow-sm p-4 card-hover">
+        <div class="glass-effect rounded-lg p-4 card-hover-effect neon-border">
           <div class="flex items-center justify-between">
-            <h3 class="text-sm font-medium text-gray-500">监测点数量</h3>
+            <h3 class="text-sm font-medium text-gray-400">监测点数量</h3>
           </div>
           <div class="mt-2">
-            <span class="text-3xl font-bold">68</span>
+            <span class="text-3xl font-bold text-teal-400">68</span>
           </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow-sm p-4 card-hover">
+        <div class="glass-effect rounded-lg p-4 card-hover-effect neon-border">
           <div class="flex items-center justify-between">
-            <h3 class="text-sm font-medium text-gray-500">病害数量</h3>
+            <h3 class="text-sm font-medium text-gray-400">病害数量</h3>
           </div>
           <div class="mt-2">
-            <span class="text-3xl font-bold text-warning">12</span>
+            <span class="text-3xl font-bold text-yellow-400">12</span>
           </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow-sm p-4 card-hover">
+        <div class="glass-effect rounded-lg p-4 card-hover-effect neon-border">
           <div class="flex items-center justify-between">
-            <h3 class="text-sm font-medium text-gray-500">最后检测时间</h3>
+            <h3 class="text-sm font-medium text-gray-400">最后检测时间</h3>
           </div>
           <div class="mt-2">
-            <span class="text-xl font-bold">2025-10-18</span>
+            <span class="text-xl font-bold text-blue-400">2025-10-18</span>
             <div class="text-gray-500 text-sm">14:35:22</div>
           </div>
         </div>
       </div>
       
       <!-- 3D模型区域 -->
-      <div class="mb-6 bg-white rounded-lg shadow-sm p-4">
+      <div class="mb-6 glass-effect rounded-lg p-4 neon-border">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-lg font-bold">桥梁3D数字孪生模型</h2>
+          <h2 class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500">桥梁3D数字孪生模型</h2>
           <div class="flex space-x-2">
-            <button class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded flex items-center">
+            <button class="text-sm bg-teal-400/10 hover:bg-teal-400/20 text-teal-300 border border-teal-400/30 px-3 py-1 rounded flex items-center transition-all">
               <i class="fa fa-refresh mr-1"></i> 刷新
             </button>
-            <button class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded flex items-center">
+            <button class="text-sm bg-teal-400/10 hover:bg-teal-400/20 text-teal-300 border border-teal-400/30 px-3 py-1 rounded flex items-center transition-all">
               <i class="fa fa-expand mr-1"></i> 全屏
             </button>
           </div>
         </div>
         
         <!-- 3D模型容器 -->
-        <div class="relative h-[400px] bg-dark rounded-lg overflow-hidden" id="model-container">
+        <div class="relative h-[400px] bg-gray-900 rounded-lg overflow-hidden grid-pattern" id="model-container">
           <!-- 3D模型（使用Three.js渲染） -->
           <!-- 模型图例 -->
-          <div class="absolute top-4 right-4 bg-black/70 backdrop-blur-sm p-2 rounded">
+          <div class="absolute top-4 right-4 glass-effect p-2 rounded">
             <div class="text-xs text-white mb-1">图例说明</div>
             <div class="flex items-center text-xs text-white mb-1">
-              <div class="w-3 h-3 bg-danger rounded-sm mr-1"></div>
+              <div class="w-3 h-3 bg-red-500 rounded-sm mr-1"></div>
               <span>裂缝</span>
             </div>
             <div class="flex items-center text-xs text-white">
-              <div class="w-3 h-3 bg-warning opacity-70 rounded-sm mr-1"></div>
+              <div class="w-3 h-3 bg-yellow-400 opacity-70 rounded-sm mr-1"></div>
               <span>溶洞</span>
             </div>
           </div>
           
           <!-- 3D控制器提示 -->
-          <div class="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm p-2 rounded">
+          <div class="absolute bottom-4 left-4 glass-effect p-2 rounded">
             <div class="text-xs text-white">
               <div class="mb-1"><i class="fa fa-arrows mr-1"></i> 鼠标拖拽: 旋转视图</div>
               <div><i class="fa fa-search mr-1"></i> 鼠标滚轮: 缩放视图</div>
@@ -230,21 +304,21 @@
           </div>
           
           <!-- 模拟桥梁模型图片 -->
-          <img src="https://picsum.photos/id/1019/1200/600" alt="桥梁3D模型" class="w-full h-full object-cover opacity-70">
+          <img src="https://picsum.photos/id/1019/1200/600" alt="桥梁3D模型" class="w-full h-full object-cover opacity-60">
           
           <!-- 模拟病害标注 -->
-          <div class="absolute top-[30%] left-[20%] w-12 h-12 rounded-full bg-warning/50 border-2 border-warning animate-pulse cursor-pointer" title="溶洞: 直径1.2m, 深度0.8m"></div>
-          <div class="absolute top-[45%] right-[35%] w-8 h-16 border-2 border-danger animate-pulse cursor-pointer" style="transform: rotate(30deg);" title="裂缝: 长度1.5m, 宽度3mm"></div>
+          <div class="absolute top-[30%] left-[20%] w-12 h-12 rounded-full bg-yellow-400/30 border-2 border-yellow-400 animate-pulse cursor-pointer shadow-lg shadow-yellow-400/30" title="溶洞: 直径1.2m, 深度0.8m"></div>
+          <div class="absolute top-[45%] right-[35%] w-8 h-16 border-2 border-red-500 animate-pulse cursor-pointer shadow-lg shadow-red-500/30" style="transform: rotate(30deg);" title="裂缝: 长度1.5m, 宽度3mm"></div>
         </div>
       </div>
       
       <!-- 数据卡片区域 -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- 位移传感器数据卡片 -->
-        <div class="bg-white rounded-lg shadow-sm p-4 card-hover">
+        <div class="glass-effect rounded-lg p-4 card-hover-effect neon-border">
           <div class="flex justify-between items-center mb-4">
-            <h3 class="font-bold">位移传感器数据曲线</h3>
-            <div class="text-xs text-gray-500">最近24小时</div>
+            <h3 class="font-bold text-teal-400">位移传感器数据曲线</h3>
+            <div class="text-xs text-gray-400">最近24小时</div>
           </div>
           <div class="h-[300px]">
             <canvas id="displacementChart"></canvas>
@@ -252,10 +326,10 @@
         </div>
         
         <!-- 震动频率频谱图卡片 -->
-        <div class="bg-white rounded-lg shadow-sm p-4 card-hover">
+        <div class="glass-effect rounded-lg p-4 card-hover-effect neon-border">
           <div class="flex justify-between items-center mb-4">
-            <h3 class="font-bold">震动频率频谱图</h3>
-            <div class="text-xs text-gray-500">最近24小时</div>
+            <h3 class="font-bold text-teal-400">震动频率频谱图</h3>
+            <div class="text-xs text-gray-400">最近24小时</div>
           </div>
           <div class="h-[300px]">
             <canvas id="vibrationChart"></canvas>
@@ -263,10 +337,10 @@
         </div>
         
         <!-- 裂缝变化趋势图卡片 -->
-        <div class="bg-white rounded-lg shadow-sm p-4 card-hover">
+        <div class="glass-effect rounded-lg p-4 card-hover-effect neon-border">
           <div class="flex justify-between items-center mb-4">
-            <h3 class="font-bold">裂缝变化趋势图</h3>
-            <div class="text-xs text-gray-500">最近30天</div>
+            <h3 class="font-bold text-teal-400">裂缝变化趋势图</h3>
+            <div class="text-xs text-gray-400">最近30天</div>
           </div>
           <div class="h-[300px]">
             <canvas id="crackTrendChart"></canvas>
@@ -274,10 +348,10 @@
         </div>
         
         <!-- 温度监测数据卡片 -->
-        <div class="bg-white rounded-lg shadow-sm p-4 card-hover">
+        <div class="glass-effect rounded-lg p-4 card-hover-effect neon-border">
           <div class="flex justify-between items-center mb-4">
-            <h3 class="font-bold">温度监测数据</h3>
-            <div class="text-xs text-gray-500">最近24小时</div>
+            <h3 class="font-bold text-teal-400">温度监测数据</h3>
+            <div class="text-xs text-gray-400">最近24小时</div>
           </div>
           <div class="h-[300px]">
             <canvas id="temperatureChart"></canvas>
@@ -298,15 +372,20 @@
           {
             label: '实际位移(mm)',
             data: [2.1, 2.3, 2.5, 2.8, 3.5, 4.2, 4.8, 5.2],
-            borderColor: '#F44336',
-            backgroundColor: 'rgba(244, 67, 54, 0.1)',
+            borderColor: '#06B6D4',
+            backgroundColor: 'rgba(6, 182, 212, 0.1)',
             tension: 0.4,
-            fill: true
+            fill: true,
+            pointBackgroundColor: '#06B6D4',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6
           },
           {
             label: '安全阈值(mm)',
             data: [5, 5, 5, 5, 5, 5, 5, 5],
-            borderColor: '#FF9800',
+            borderColor: '#FACC15',
             borderDash: [5, 5],
             tension: 0,
             pointRadius: 0,
@@ -320,7 +399,28 @@
         plugins: {
           tooltip: {
             mode: 'index',
-            intersect: false
+            intersect: false,
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            titleColor: '#06B6D4',
+            bodyColor: '#fff',
+            borderColor: '#06B6D4',
+            borderWidth: 1,
+            padding: 12,
+            boxPadding: 6,
+            usePointStyle: true,
+            callbacks: {
+              label: function(context) {
+                return context.dataset.label + ': ' + context.raw;
+              }
+            }
+          },
+          legend: {
+            labels: {
+              color: '#E2E8F0',
+              font: {
+                family: 'Inter'
+              }
+            }
           },
           annotation: {
             annotations: {
@@ -328,7 +428,7 @@
                 type: 'line',
                 yMin: 5,
                 yMax: 5,
-                borderColor: 'rgb(255, 99, 132)',
+                borderColor: '#FACC15',
                 borderWidth: 2,
               }
             }
@@ -339,7 +439,24 @@
             beginAtZero: true,
             title: {
               display: true,
-              text: '位移(mm)'
+              text: '位移(mm)',
+              color: '#94A3B8'
+            },
+            grid: {
+              color: 'rgba(148, 163, 184, 0.1)',
+              borderColor: 'rgba(148, 163, 184, 0.2)'
+            },
+            ticks: {
+              color: '#94A3B8'
+            }
+          },
+          x: {
+            grid: {
+              color: 'rgba(148, 163, 184, 0.1)',
+              borderColor: 'rgba(148, 163, 184, 0.2)'
+            },
+            ticks: {
+              color: '#94A3B8'
             }
           }
         }
@@ -356,12 +473,20 @@
           label: '振动强度',
           data: [12, 28, 35, 22, 15, 8],
           backgroundColor: [
-            'rgba(54, 162, 235, 0.7)',
-            'rgba(54, 162, 235, 0.7)',
-            'rgba(255, 99, 132, 0.7)',
-            'rgba(54, 162, 235, 0.7)',
-            'rgba(54, 162, 235, 0.7)',
-            'rgba(54, 162, 235, 0.7)'
+            'rgba(6, 182, 212, 0.7)',
+            'rgba(6, 182, 212, 0.7)',
+            'rgba(239, 68, 68, 0.7)',
+            'rgba(6, 182, 212, 0.7)',
+            'rgba(6, 182, 212, 0.7)',
+            'rgba(6, 182, 212, 0.7)'
+          ],
+          borderColor: [
+            'rgba(6, 182, 212, 1)',
+            'rgba(6, 182, 212, 1)',
+            'rgba(239, 68, 68, 1)',
+            'rgba(6, 182, 212, 1)',
+            'rgba(6, 182, 212, 1)',
+            'rgba(6, 182, 212, 1)'
           ],
           borderWidth: 1
         }]
@@ -374,18 +499,48 @@
             beginAtZero: true,
             title: {
               display: true,
-              text: '强度'
+              text: '强度',
+              color: '#94A3B8'
+            },
+            grid: {
+              color: 'rgba(148, 163, 184, 0.1)',
+              borderColor: 'rgba(148, 163, 184, 0.2)'
+            },
+            ticks: {
+              color: '#94A3B8'
+            }
+          },
+          x: {
+            grid: {
+              color: 'rgba(148, 163, 184, 0.1)',
+              borderColor: 'rgba(148, 163, 184, 0.2)'
+            },
+            ticks: {
+              color: '#94A3B8'
             }
           }
         },
         plugins: {
           tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            titleColor: '#06B6D4',
+            bodyColor: '#fff',
+            borderColor: '#06B6D4',
+            borderWidth: 1,
             callbacks: {
               afterLabel: function(context) {
                 if (context.dataIndex === 2) {
                   return '⚠️ 该频率段振动异常，超过安全阈值';
                 }
                 return '';
+              }
+            }
+          },
+          legend: {
+            labels: {
+              color: '#E2E8F0',
+              font: {
+                family: 'Inter'
               }
             }
           }
@@ -402,10 +557,15 @@
         datasets: [{
           label: '裂缝长度(mm)',
           data: [120, 135, 148, 165, 185, 210, 245],
-          borderColor: '#F44336',
-          backgroundColor: 'rgba(244, 67, 54, 0.1)',
+          borderColor: '#EF4444',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
           tension: 0.4,
-          fill: true
+          fill: true,
+          pointBackgroundColor: '#EF4444',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6
         }]
       },
       options: {
@@ -416,18 +576,49 @@
             beginAtZero: true,
             title: {
               display: true,
-              text: '长度(mm)'
+              text: '长度(mm)',
+              color: '#94A3B8'
+            },
+            grid: {
+              color: 'rgba(148, 163, 184, 0.1)',
+              borderColor: 'rgba(148, 163, 184, 0.2)'
+            },
+            ticks: {
+              color: '#94A3B8'
+            }
+          },
+          x: {
+            grid: {
+              color: 'rgba(148, 163, 184, 0.1)',
+              borderColor: 'rgba(148, 163, 184, 0.2)'
+            },
+            ticks: {
+              color: '#94A3B8'
             }
           }
         },
         plugins: {
           tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            titleColor: '#06B6D4',
+            bodyColor: '#fff',
+            borderColor: '#06B6D4',
+            borderWidth: 1,
+            padding: 12,
             callbacks: {
               afterLabel: function(context) {
                 if (context.dataIndex === 6) {
                   return '⚠️ 该数据已超阈值，建议检查';
                 }
                 return '';
+              }
+            }
+          },
+          legend: {
+            labels: {
+              color: '#E2E8F0',
+              font: {
+                family: 'Inter'
               }
             }
           }
@@ -444,10 +635,15 @@
         datasets: [{
           label: '温度(°C)',
           data: [18, 17, 16, 19, 24, 26, 24, 21],
-          borderColor: '#FF9800',
-          backgroundColor: 'rgba(255, 152, 0, 0.1)',
+          borderColor: '#3B82F6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
           tension: 0.4,
-          fill: true
+          fill: true,
+          pointBackgroundColor: '#3B82F6',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6
         }]
       },
       options: {
@@ -457,7 +653,43 @@
           y: {
             title: {
               display: true,
-              text: '温度(°C)'
+              text: '温度(°C)',
+              color: '#94A3B8'
+            },
+            grid: {
+              color: 'rgba(148, 163, 184, 0.1)',
+              borderColor: 'rgba(148, 163, 184, 0.2)'
+            },
+            ticks: {
+              color: '#94A3B8'
+            }
+          },
+          x: {
+            grid: {
+              color: 'rgba(148, 163, 184, 0.1)',
+              borderColor: 'rgba(148, 163, 184, 0.2)'
+            },
+            ticks: {
+              color: '#94A3B8'
+            }
+          }
+        },
+        plugins: {
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            titleColor: '#06B6D4',
+            bodyColor: '#fff',
+            borderColor: '#06B6D4',
+            borderWidth: 1,
+            padding: 12,
+            usePointStyle: true
+          },
+          legend: {
+            labels: {
+              color: '#E2E8F0',
+              font: {
+                family: 'Inter'
+              }
             }
           }
         }

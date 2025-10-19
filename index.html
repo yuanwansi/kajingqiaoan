@@ -10,23 +10,27 @@
   <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
   <!-- 引入Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  <!-- 引入Inter字体 -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
-  <!-- Tailwind配置 -->
+  <!-- Tailwind配置 - 现代化科技风格 -->
   <script>
     tailwind.config = {
       theme: {
         extend: {
           colors: {
-            primary: '#0D1B2A',
-            secondary: '#2C3E50',
-            success: '#4CAF50',
-            warning: '#FF9800',
-            danger: '#F44336',
-            info: '#64B5F6',
-            dark: '#121212',
+            primary: '#0F172A',       // 深蓝黑色背景
+            secondary: '#1E293B',     // 深灰蓝色
+            accent: '#06B6D4',        // 亮青色作为科技感主色调
+            success: '#10B981',       // 鲜亮绿色
+            warning: '#F59E0B',       // 明黄色
+            danger: '#EF4444',        // 鲜红色
+            info: '#3B82F6',          // 蓝色
+            dark: '#020617',          // 近黑色
+            'accent-glow': '#06B6D433', // 主色调发光效果
           },
           fontFamily: {
-            sans: ['"Noto Sans SC"', '"Source Han Sans SC"', 'sans-serif'],
+            sans: ['Inter', '"Noto Sans SC"', 'sans-serif'],
           },
         },
       }
@@ -41,6 +45,9 @@
       .text-shadow {
         text-shadow: 0 2px 4px rgba(0,0,0,0.1);
       }
+      .text-shadow-glow {
+        text-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+      }
       .animate-pulse-slow {
         animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
       }
@@ -53,6 +60,20 @@
       .scrollbar-hide {
         -ms-overflow-style: none;
         scrollbar-width: none;
+      }
+      .glass-effect {
+        backdrop-filter: blur(12px);
+        background-color: rgba(15, 23, 42, 0.8);
+      }
+      .neon-border {
+        box-shadow: 0 0 10px rgba(6, 182, 212, 0.3), inset 0 0 10px rgba(6, 182, 212, 0.1);
+        border: 1px solid rgba(6, 182, 212, 0.2);
+      }
+      .grid-pattern {
+        background-image: 
+          linear-gradient(rgba(6, 182, 212, 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(6, 182, 212, 0.05) 1px, transparent 1px);
+        background-size: 20px 20px;
       }
     }
     
@@ -70,20 +91,29 @@
   </style>
 </head>
 <body class="bg-gray-100 font-sans text-gray-800">
-  <!-- 登录页面 -->
-  <div class="min-h-screen flex items-center justify-center bg-primary">
-    <div class="w-full max-w-md p-8 bg-white rounded-lg shadow-xl">
+  <!-- 登录页面 - 现代化科技风格 -->
+  <div class="min-h-screen flex items-center justify-center bg-primary grid-pattern overflow-hidden">
+    <!-- 背景装饰元素 -->
+    <div class="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+      <div class="absolute top-1/4 -left-20 w-64 h-64 rounded-full bg-accent-glow blur-3xl"></div>
+      <div class="absolute bottom-1/4 -right-20 w-80 h-80 rounded-full bg-info/20 blur-3xl"></div>
+    </div>
+    
+    <div class="w-full max-w-md p-8 glass-effect rounded-xl neon-border shadow-2xl relative z-10">
       <div class="text-center mb-8">
-        <h2 class="text-3xl font-bold text-primary mb-2">喀境桥安</h2>
-        <p class="text-gray-600">喀斯特山区桥梁智能预防坍塌系统</p>
+        <div class="inline-flex items-center justify-center p-4 rounded-full bg-accent-glow mb-4">
+          <i class="fa fa-bridge text-4xl text-accent text-shadow-glow"></i>
+        </div>
+        <h2 class="text-3xl font-bold text-white mb-2">喀境桥安</h2>
+        <p class="text-gray-300">喀斯特山区桥梁智能预防坍塌系统</p>
       </div>
       
       <form>
         <div class="mb-6">
-          <label class="block text-gray-700 text-sm font-bold mb-2" for="user-type">
+          <label class="block text-gray-300 text-sm font-medium mb-2" for="user-type">
             用户类型
           </label>
-          <select id="user-type" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+          <select id="user-type" class="w-full px-4 py-3 bg-secondary border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all duration-300">
             <option value="">请选择用户类型</option>
             <option value="g">政府交通管理部门 (G端)</option>
             <option value="b">桥梁养护公司 (B端)</option>
@@ -92,25 +122,42 @@
         </div>
         
         <div class="mb-6">
-          <label class="block text-gray-700 text-sm font-bold mb-2" for="username">
+          <label class="block text-gray-300 text-sm font-medium mb-2" for="username">
             用户名
           </label>
-          <input id="username" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" type="text" placeholder="请输入用户名">
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+              <i class="fa fa-user"></i>
+            </div>
+            <input id="username" class="w-full pl-10 pr-4 py-3 bg-secondary border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all duration-300" type="text" placeholder="请输入用户名">
+          </div>
         </div>
         
         <div class="mb-8">
-          <label class="block text-gray-700 text-sm font-bold mb-2" for="password">
+          <label class="block text-gray-300 text-sm font-medium mb-2" for="password">
             密码
           </label>
-          <input id="password" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" type="password" placeholder="请输入密码">
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+              <i class="fa fa-lock"></i>
+            </div>
+            <input id="password" class="w-full pl-10 pr-4 py-3 bg-secondary border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all duration-300" type="password" placeholder="请输入密码">
+          </div>
         </div>
         
-        <div class="flex items-center justify-between">
-          <button id="login-btn" class="px-8 py-3 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
-            登录
-          </button>
-          <a href="#" class="text-primary hover:text-primary/80 text-sm">忘记密码?</a>
+        <div class="flex items-center justify-between mb-6">
+          <div class="flex items-center">
+            <input id="remember-me" type="checkbox" class="h-4 w-4 text-accent border-gray-600 rounded focus:ring-accent">
+            <label for="remember-me" class="ml-2 block text-sm text-gray-300">
+              记住我
+            </label>
+          </div>
+          <a href="#" class="text-accent hover:text-accent/80 text-sm transition-colors duration-300">忘记密码?</a>
         </div>
+        
+        <button id="login-btn" class="w-full py-3 bg-accent text-white rounded-lg font-medium hover:bg-accent/90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent shadow-lg shadow-accent/20">
+          登录
+        </button>
       </form>
     </div>
   </div>
